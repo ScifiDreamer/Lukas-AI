@@ -1,0 +1,1729 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>Lukášovy Gorily</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root {
+    --active-color: #777777;
+}
+
+body {
+    background: #000;
+    color: #fff;
+    font-family: monospace;
+    margin: 0;
+    text-align: center;
+}
+
+#gameContainer {
+    margin: 10px auto;
+    max-width: 900px;
+    position: relative;
+}
+
+#gameContainer:fullscreen {
+    max-width: none;
+    width: 100vw;
+    height: 100vh;
+    overflow: auto;
+    background: #000;
+    padding-top: 6px;
+}
+
+h1 {
+    margin: 10px 0 4px;
+}
+
+#score {
+    margin: 0 0 8px;
+    font-size: 17px;
+    font-weight: bold;
+    line-height: 1.35;
+}
+
+canvas {
+    background: #000;
+    border: 1px solid #555;
+    display: block;
+    margin: 0 auto 10px;
+    width: 100%;
+    height: auto;
+    touch-action: none;
+}
+
+#controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+}
+
+#settings {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+    padding: 10px;
+}
+
+@media (max-width: 650px) {
+    #settings {
+        grid-template-columns: 1fr;
+    }
+}
+
+.control-row,
+#settings label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+label {
+    text-align: left;
+}
+
+.main-label {
+    font-size: 21px;
+    font-weight: bold;
+}
+
+input[type="range"] {
+    flex: 3;
+    height: 10px;
+    border-radius: 999px;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background: #333;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--active-color);
+    border: 2px solid white;
+    cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--active-color);
+    border: 2px solid white;
+    cursor: pointer;
+}
+
+input[type="number"],
+select {
+    flex: 3;
+    padding: 8px;
+    font-size: 18px;
+    border-radius: 6px;
+    border: 1px solid #555;
+    background: #111;
+    color: white;
+}
+
+input[type="color"] {
+    flex: 3;
+    height: 34px;
+    cursor: pointer;
+}
+
+input[type="checkbox"] {
+    transform: scale(1.35);
+    cursor: pointer;
+}
+
+button {
+    padding: 12px 16px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-top: 5px;
+    border: 0;
+    border-radius: 6px;
+    background: #222;
+    color: white;
+}
+
+button:hover {
+    background: #333;
+}
+
+.small-reset,
+.small-button {
+    align-self: flex-end;
+    padding: 6px 10px;
+    font-size: 12px;
+    opacity: 0.82;
+    background: #1b1b1b;
+}
+
+.small-reset:hover,
+.small-button:hover {
+    opacity: 1;
+    background: #333;
+}
+
+.full-row {
+    grid-column: 1 / -1;
+}
+
+#mouseHelp {
+    font-size: 13px;
+    opacity: 0.82;
+    line-height: 1.35;
+}
+
+#status {
+    margin: 5px;
+    min-height: 24px;
+}
+
+details {
+    background: #111;
+    padding: 10px;
+    border-radius: 6px;
+}
+
+details summary {
+    cursor: pointer;
+    font-size: 18px;
+    padding: 5px;
+}
+
+#gameUi {
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.controls-hidden #gameUi {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+}
+
+#bigMessage {
+    position: absolute;
+    top: 38%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 42px;
+    font-weight: bold;
+    color: #fff200;
+    background: #111;
+    border: 4px solid #fff200;
+    border-radius: 14px;
+    padding: 22px 30px;
+    box-shadow:
+        0 0 0 5px rgba(0,0,0,0.8),
+        0 10px 30px rgba(0,0,0,0.75);
+    text-shadow: 3px 3px 0 #000;
+    display: none;
+    pointer-events: none;
+    z-index: 10;
+    width: min(82%, 620px);
+}
+</style>
+</head>
+
+<body>
+
+<script>
+const GAME_VERSION = "v24";
+</script>
+
+<div id="gameContainer">
+    <div id="bigMessage"></div>
+
+    <h1>Lukášovy Gorily</h1>
+
+    <div id="score"></div>
+
+    <canvas id="game" width="800" height="400" tabindex="0"></canvas>
+
+    <div id="gameUi">
+        <div id="controls">
+            <div class="control-row">
+                <span>Gorila na tahu: <span id="playerLabel">1</span></span>
+            </div>
+
+            <div class="control-row">
+                <label class="main-label">Úhel (°): <span id="angleValue">45</span></label>
+                <input type="range" id="angle" min="-20" max="200" value="45">
+            </div>
+
+            <div class="control-row">
+                <label class="main-label">Síla: <span id="powerValue">50</span></label>
+                <input type="range" id="power" min="10" max="100" value="50">
+            </div>
+
+            <div class="control-row">
+                <label class="main-label">Úhel textem:</label>
+                <input type="number" id="angleText" min="-20" max="200" value="45">
+            </div>
+
+            <div class="control-row">
+                <label class="main-label">Síla textem:</label>
+                <input type="number" id="powerText" min="10" max="100" value="50">
+            </div>
+
+            <div id="mouseHelp">
+                Terčík, slidery i textová pole fungují současně.
+                Terčík posuneš myší nebo šipkami. Mezerník hodí banán.
+            </div>
+
+            <button id="throwBtn">Hodit banán</button>
+        </div>
+
+        <details>
+            <summary>Nastavení</summary>
+
+            <div id="settings">
+                <label>
+                    Počet hráčů: <span id="playerCountValue">2</span>
+                    <input type="range" id="playerCount" min="2" max="5" value="2">
+                </label>
+
+                <label>
+                    Počet mrakodrapů: <span id="buildingCountValue">9</span>
+                    <input type="range" id="buildingCount" min="6" max="20" value="9">
+                </label>
+
+                <label>
+                    Barva gorily 1:
+                    <input type="color" id="color1" value="#777777">
+                </label>
+
+                <label>
+                    Barva gorily 2:
+                    <input type="color" id="color2" value="#8b5a2b">
+                </label>
+
+                <label>
+                    Barva gorily 3:
+                    <input type="color" id="color3" value="#3366ff">
+                </label>
+
+                <label>
+                    Barva gorily 4:
+                    <input type="color" id="color4" value="#33aa55">
+                </label>
+
+                <label>
+                    Barva gorily 5:
+                    <input type="color" id="color5" value="#aa33cc">
+                </label>
+
+                <label>
+                    Velikost exploze: <span id="explosionSizeValue">40</span>
+                    <input type="range" id="explosionSize" min="10" max="1000" value="40">
+                </label>
+
+                <label>
+                    Počet oken vodorovně: <span id="windowColumnsValue">4</span>
+                    <input type="range" id="windowColumns" min="1" max="20" value="4">
+                </label>
+
+                <label>
+                    Velikost oken: <span id="windowSizeValue">8</span>
+                    <input type="range" id="windowSize" min="3" max="18" value="8">
+                </label>
+
+                <label>
+                    Barevné mrakodrapy:
+                    <input type="checkbox" id="coloredBuildings" checked>
+                </label>
+
+                <label>
+                    Zobrazit trajektorii:
+                    <input type="checkbox" id="trajectory" checked>
+                </label>
+
+                <div class="full-row">
+                    <button id="fullscreenBtn" class="small-button">Celá obrazovka</button>
+                    <button id="resetBtn" class="small-reset">Nová hra</button>
+                </div>
+
+                <p class="full-row" style="opacity:0.7;">Verze: <span id="versionSettings"></span></p>
+            </div>
+        </details>
+
+        <div id="status"></div>
+    </div>
+</div>
+
+<script>
+document.getElementById("versionSettings").textContent = GAME_VERSION;
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const BASE_W = 800;
+const BASE_H = 400;
+let W = BASE_W;
+let H = BASE_H;
+
+const SKY_COLOR = "#4aa3ff";
+
+const SUN = {
+    xRatio: 690 / 800,
+    yRatio: 62 / 400,
+    r: 28,
+    surprisedTimer: 0
+};
+
+const CLOUDS = [
+    { xRatio: 120 / 800, yRatio: 80 / 400, rainTimer: 0, drops: [] },
+    { xRatio: 500 / 800, yRatio: 105 / 400, rainTimer: 0, drops: [] }
+];
+
+const BUILDING_COLORS = [
+    "#30343f",
+    "#3d315b",
+    "#2f4858",
+    "#4b3f72",
+    "#5c374c",
+    "#3c5a40",
+    "#5f4b32",
+    "#263238",
+    "#4a4e69",
+    "#355070"
+];
+
+let buildings = [];
+let gorillas = [];
+let currentPlayer = 0;
+let banana = null;
+let gravity = 0.4;
+let score = [0, 0, 0, 0, 0];
+let lastAngle = [45, 45, 45, 45, 45];
+let lastPower = [50, 50, 50, 50, 50];
+let explosion = null;
+let trajectoryPoints = [];
+let roundOver = false;
+let uiHideTimer = null;
+let mouseAim = null;
+let draggingAim = false;
+
+function $(id) {
+    return document.getElementById(id);
+}
+
+function playerCount() {
+    return parseInt($("playerCount").value);
+}
+
+function randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function distance(x1, y1, x2, y2) {
+    return Math.hypot(x1 - x2, y1 - y2);
+}
+
+function isFullscreen() {
+    return document.fullscreenElement === $("gameContainer");
+}
+
+function isTrajectoryOn() {
+    return $("trajectory").checked;
+}
+
+function sunX() {
+    return W * SUN.xRatio;
+}
+
+function sunY() {
+    return H * SUN.yRatio;
+}
+
+function cloudX(cloud) {
+    return W * cloud.xRatio;
+}
+
+function cloudY(cloud) {
+    return H * cloud.yRatio;
+}
+
+function angleToRadians() {
+    return parseFloat($("angle").value) * Math.PI / 180;
+}
+
+function directionFromAngle() {
+    return Math.cos(angleToRadians()) >= 0 ? 1 : -1;
+}
+
+function normalizeMouseAngle(angle) {
+    if (angle < -20) angle += 360;
+    return clamp(angle, -20, 200);
+}
+
+function showBigMessage(text) {
+    const msg = $("bigMessage");
+    const container = $("gameContainer");
+
+    msg.textContent = text;
+    msg.style.display = "block";
+    container.classList.add("controls-hidden");
+
+    clearTimeout(uiHideTimer);
+
+    uiHideTimer = setTimeout(() => {
+        msg.style.display = "none";
+        container.classList.remove("controls-hidden");
+    }, 2200);
+}
+
+function updateScoreDisplay() {
+    let html = "Skóre - ";
+
+    for (let i = 0; i < playerCount(); i++) {
+        html += "Gorila " + (i + 1) + ": <span>" + score[i] + "</span>";
+        if (i < playerCount() - 1) html += " | ";
+    }
+
+    $("score").innerHTML = html;
+}
+
+function activeGorillas() {
+    return gorillas
+        .map((g, index) => ({ g, index }))
+        .filter(item => !item.g.dead);
+}
+
+function endRound(message, winnerIndex) {
+    if (roundOver) return;
+
+    roundOver = true;
+    banana = null;
+
+    if (winnerIndex !== null && winnerIndex !== undefined) {
+        score[winnerIndex]++;
+        updateScoreDisplay();
+    }
+
+    showBigMessage(message);
+
+    setTimeout(() => {
+        newGame();
+    }, 2400);
+}
+
+function getBuildingColor(index) {
+    if (!$("coloredBuildings").checked) return "#333";
+    return BUILDING_COLORS[index % BUILDING_COLORS.length];
+}
+
+function getEffectiveBuildingCount() {
+    const base = parseInt($("buildingCount").value);
+
+    if (!isFullscreen()) return base;
+
+    return Math.min(36, base + Math.ceil(base * 0.7));
+}
+
+function generateEvenWindows(buildingX, buildingWidth, buildingHeight, horizontalCount) {
+    const windows = [];
+    const size = parseInt($("windowSize").value);
+    const topY = H - buildingHeight;
+
+    const maxCols = Math.max(1, Math.floor((buildingWidth - 2) / (size + 1)));
+    const cols = clamp(horizontalCount, 1, maxCols);
+
+    const gapX = (buildingWidth - cols * size) / (cols + 1);
+
+    const maxRows = Math.max(1, Math.floor((buildingHeight - 2) / (size + 1)));
+    let rows = 1;
+
+    for (let possibleRows = maxRows; possibleRows >= 1; possibleRows--) {
+        const gapY = (buildingHeight - possibleRows * size) / (possibleRows + 1);
+
+        if (gapY >= 3) {
+            rows = possibleRows;
+            break;
+        }
+    }
+
+    const gapY = (buildingHeight - rows * size) / (rows + 1);
+
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            windows.push({
+                x: buildingX + gapX + col * (size + gapX),
+                y: topY + gapY + row * (size + gapY),
+                lit: Math.random() < 0.5
+            });
+        }
+    }
+
+    return windows;
+}
+
+function generateBuildings() {
+    buildings = [];
+
+    const cols = getEffectiveBuildingCount();
+    const colWidth = W / cols;
+    const horizontalWindows = parseInt($("windowColumns").value);
+
+    const minHeight = isFullscreen() ? Math.max(100, H * 0.18) : 80;
+    const maxHeight = isFullscreen() ? Math.max(220, H * 0.62) : 260;
+
+    for (let i = 0; i < cols; i++) {
+        const height = randomInt(Math.round(minHeight), Math.round(maxHeight));
+
+        buildings.push({
+            x: i * colWidth,
+            width: colWidth,
+            height,
+            color: getBuildingColor(i),
+            holes: [],
+            windows: generateEvenWindows(i * colWidth, colWidth, height, horizontalWindows)
+        });
+    }
+}
+
+function pickDistinctBuildingIndexes(count) {
+    const buildingCount = buildings.length;
+    const indexes = [];
+
+    for (let i = 0; i < count; i++) {
+        const target = Math.round((i + 0.5) * buildingCount / count - 0.5);
+        const clamped = clamp(target, 0, buildingCount - 1);
+
+        let chosen = clamped;
+        let radius = 0;
+
+        while (indexes.includes(chosen)) {
+            radius++;
+
+            const left = clamp(clamped - radius, 0, buildingCount - 1);
+            const right = clamp(clamped + radius, 0, buildingCount - 1);
+
+            if (!indexes.includes(left)) {
+                chosen = left;
+                break;
+            }
+
+            if (!indexes.includes(right)) {
+                chosen = right;
+                break;
+            }
+        }
+
+        indexes.push(chosen);
+    }
+
+    return indexes;
+}
+
+function placeGorillas() {
+    const count = playerCount();
+    const indexes = pickDistinctBuildingIndexes(count);
+
+    gorillas = indexes.map((buildingIndex, playerIndex) => {
+        const building = buildings[buildingIndex];
+
+        return {
+            x: building.x + building.width / 2,
+            y: H - building.height - 20,
+            r: 18,
+            buildingIndex,
+            color: $("color" + (playerIndex + 1)).value,
+            dead: false
+        };
+    });
+}
+
+function updateGorillaPositions() {
+    gorillas.forEach(g => {
+        if (g.dead) return;
+
+        const building = buildings[g.buildingIndex];
+        g.y = H - building.height - 20;
+    });
+}
+
+function drawSunFace() {
+    const surprised = SUN.surprisedTimer > 0;
+    const x = sunX();
+    const y = sunY();
+
+    ctx.save();
+
+    ctx.fillStyle = "#4a2b00";
+    ctx.beginPath();
+    ctx.arc(x - 9, y - 7, surprised ? 3.4 : 2.6, 0, Math.PI * 2);
+    ctx.arc(x + 9, y - 7, surprised ? 3.4 : 2.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#4a2b00";
+    ctx.fillStyle = "#4a2b00";
+    ctx.lineWidth = 3;
+
+    if (surprised) {
+        ctx.beginPath();
+        ctx.ellipse(x, y + 8, 6, 9, 0, 0, Math.PI * 2);
+        ctx.fill();
+    } else {
+        ctx.beginPath();
+        ctx.arc(x, y + 3, 11, 0.15 * Math.PI, 0.85 * Math.PI);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+function drawCloud(cloud) {
+    const cx = cloudX(cloud);
+    const cy = cloudY(cloud);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+
+    if (cloud.xRatio < 0.3) {
+        ctx.arc(cx, cy, 25, 0, Math.PI * 2);
+        ctx.arc(cx + 30, cy, 30, 0, Math.PI * 2);
+        ctx.arc(cx + 60, cy, 25, 0, Math.PI * 2);
+    } else {
+        ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+        ctx.arc(cx + 25, cy, 24, 0, Math.PI * 2);
+        ctx.arc(cx + 55, cy, 18, 0, Math.PI * 2);
+    }
+
+    ctx.fill();
+
+    if (cloud.rainTimer > 0) {
+        ctx.strokeStyle = "rgba(45, 120, 255, 0.85)";
+        ctx.lineWidth = 2;
+
+        cloud.drops.forEach(drop => {
+            ctx.beginPath();
+            ctx.moveTo(drop.x, drop.y);
+            ctx.lineTo(drop.x - 2, drop.y + 10);
+            ctx.stroke();
+        });
+    }
+}
+
+function drawBackground() {
+    ctx.fillStyle = SKY_COLOR;
+    ctx.fillRect(0, 0, W, H);
+
+    const sx = sunX();
+    const sy = sunY();
+
+    ctx.strokeStyle = "rgba(255, 238, 80, 0.85)";
+    ctx.lineWidth = 3;
+
+    for (let i = 0; i < 16; i++) {
+        const angle = i * Math.PI * 2 / 16;
+
+        ctx.beginPath();
+        ctx.moveTo(
+            sx + Math.cos(angle) * (SUN.r + 6),
+            sy + Math.sin(angle) * (SUN.r + 6)
+        );
+        ctx.lineTo(
+            sx + Math.cos(angle) * (SUN.r + 18),
+            sy + Math.sin(angle) * (SUN.r + 18)
+        );
+        ctx.stroke();
+    }
+
+    ctx.fillStyle = "#ffdd33";
+    ctx.beginPath();
+    ctx.arc(sx, sy, SUN.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    drawSunFace();
+
+    CLOUDS.forEach(drawCloud);
+}
+
+function drawBuildings() {
+    const size = parseInt($("windowSize").value);
+
+    buildings.forEach(building => {
+        ctx.fillStyle = building.color;
+        ctx.fillRect(building.x, H - building.height, building.width, building.height);
+
+        building.windows.forEach(w => {
+            ctx.fillStyle = w.lit ? "#ffee88" : "rgba(0,0,0,0.42)";
+            ctx.fillRect(w.x, w.y, size, size);
+        });
+
+        ctx.fillStyle = SKY_COLOR;
+
+        building.holes.forEach(hole => {
+            ctx.beginPath();
+            ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    });
+}
+
+function drawGorilla(g, index) {
+    if (g.dead) return;
+
+    const isCurrent = index === currentPlayer && !roundOver;
+    const dir = isCurrent ? directionFromAngle() : 1;
+
+    const x = g.x;
+    const y = g.y;
+    const r = g.r;
+
+    ctx.save();
+
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    ctx.strokeStyle = g.color;
+    ctx.lineWidth = 7;
+
+    ctx.beginPath();
+    ctx.moveTo(x - 7, y + 12);
+    ctx.lineTo(x - 17, y + 30);
+    ctx.moveTo(x + 7, y + 12);
+    ctx.lineTo(x + 17, y + 30);
+    ctx.stroke();
+
+    ctx.beginPath();
+
+    if (isCurrent && !banana) {
+        ctx.moveTo(x - 10, y - 4);
+        ctx.lineTo(x - 24, y + 12);
+
+        ctx.moveTo(x + 10, y - 4);
+        ctx.lineTo(x + dir * 28, y - 24);
+    } else {
+        ctx.moveTo(x - 10, y - 4);
+        ctx.lineTo(x - 26, y + 12);
+
+        ctx.moveTo(x + 10, y - 4);
+        ctx.lineTo(x + 26, y + 12);
+    }
+
+    ctx.stroke();
+
+    ctx.fillStyle = g.color;
+    ctx.beginPath();
+    ctx.ellipse(x, y, r, r * 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255, 210, 130, 0.75)";
+    ctx.beginPath();
+    ctx.ellipse(x, y + 4, r * 0.55, r * 0.65, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = g.color;
+    ctx.beginPath();
+    ctx.arc(x, y - r - 10, r * 0.68, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffbd75";
+    ctx.beginPath();
+    ctx.ellipse(x, y - r - 7, r * 0.43, r * 0.34, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#111";
+    ctx.beginPath();
+    ctx.arc(x - 5, y - r - 13, 2.2, 0, Math.PI * 2);
+    ctx.arc(x + 5, y - r - 13, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y - r - 6, 5, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.stroke();
+
+    if (isCurrent && !banana) {
+        ctx.strokeStyle = "#ffee00";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(x + dir * 31, y - 27, 8, 0.15 * Math.PI, 0.85 * Math.PI);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+function drawGorillas() {
+    gorillas.forEach((g, index) => drawGorilla(g, index));
+}
+
+function drawBanana() {
+    if (!banana) return;
+
+    ctx.save();
+
+    ctx.translate(banana.x, banana.y);
+    ctx.rotate(banana.rotation);
+
+    ctx.strokeStyle = "#ffff00";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 8, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawActualTrajectory() {
+    if (!isTrajectoryOn()) return;
+    if (trajectoryPoints.length < 2) return;
+
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+
+    ctx.beginPath();
+
+    trajectoryPoints.forEach((p, index) => {
+        if (index === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+    });
+
+    ctx.stroke();
+}
+
+function getThrowStartForAngle(angleDeg) {
+    const g = gorillas[currentPlayer];
+    const dir = Math.cos(angleDeg * Math.PI / 180) >= 0 ? 1 : -1;
+
+    return {
+        x: g.x + dir * 24,
+        y: g.y - 24
+    };
+}
+
+function getThrowStart() {
+    return getThrowStartForAngle(parseFloat($("angle").value));
+}
+
+function drawAimTrajectory() {
+    if (!isTrajectoryOn()) return;
+    if (banana || roundOver) return;
+    if (!gorillas[currentPlayer] || gorillas[currentPlayer].dead) return;
+
+    const angle = parseFloat($("angle").value);
+    const power = parseFloat($("power").value);
+    const angleRad = angle * Math.PI / 180;
+    const start = getThrowStartForAngle(angle);
+
+    let x = start.x;
+    let y = start.y;
+    let vx = Math.cos(angleRad) * power * 0.3;
+    let vy = -Math.sin(angleRad) * power * 0.3;
+
+    ctx.save();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 6]);
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+
+    for (let i = 0; i < 150; i++) {
+        x += vx;
+        y += vy;
+        vy += gravity;
+
+        ctx.lineTo(x, y);
+
+        if (x < 0 || x > W || y > H) break;
+        if (checkCollisionWithBuildings(x, y) !== -1) break;
+        if (checkCollisionWithAnyGorilla(x, y, currentPlayer) !== -1) break;
+    }
+
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawMouseTarget() {
+    if (!mouseAim || banana || roundOver) return;
+
+    const g = gorillas[currentPlayer];
+    if (!g || g.dead) return;
+
+    const start = getThrowStart();
+
+    ctx.save();
+
+    ctx.setLineDash([6, 5]);
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(mouseAim.x, mouseAim.y);
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = "rgba(74, 163, 255, 0.28)";
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+    ctx.lineWidth = 3;
+
+    ctx.beginPath();
+    ctx.arc(mouseAim.x, mouseAim.y, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(mouseAim.x - 18, mouseAim.y);
+    ctx.lineTo(mouseAim.x + 18, mouseAim.y);
+    ctx.moveTo(mouseAim.x, mouseAim.y - 18);
+    ctx.lineTo(mouseAim.x, mouseAim.y + 18);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawExplosion() {
+    if (!explosion) return;
+
+    const alpha = Math.max(0, 1 - explosion.timer / 38);
+    const pulse = explosion.phase === 0 ? 1 : explosion.phase === 1 ? 0.8 : 0.5;
+
+    ctx.save();
+
+    ctx.globalAlpha = alpha;
+
+    const gradient = ctx.createRadialGradient(
+        explosion.x,
+        explosion.y,
+        2,
+        explosion.x,
+        explosion.y,
+        explosion.r * pulse
+    );
+
+    gradient.addColorStop(0, "white");
+    gradient.addColorStop(0.22, "yellow");
+    gradient.addColorStop(0.62, "orange");
+    gradient.addColorStop(1, "red");
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(explosion.x, explosion.y, explosion.r * pulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+function drawScene() {
+    ctx.clearRect(0, 0, W, H);
+
+    drawBackground();
+    drawBuildings();
+    updateGorillaPositions();
+    drawAimTrajectory();
+    drawMouseTarget();
+    drawGorillas();
+    drawActualTrajectory();
+    drawBanana();
+    drawExplosion();
+}
+
+function circleIntersectsRect(cx, cy, r, rx, ry, rw, rh) {
+    const closestX = Math.max(rx, Math.min(cx, rx + rw));
+    const closestY = Math.max(ry, Math.min(cy, ry + rh));
+
+    const dx = cx - closestX;
+    const dy = cy - closestY;
+
+    return dx * dx + dy * dy <= r * r;
+}
+
+function updateExplosion() {
+    if (!explosion) return;
+
+    explosion.timer++;
+
+    if (explosion.timer > 10 && explosion.phase === 0) explosion.phase = 1;
+    if (explosion.timer > 24 && explosion.phase === 1) explosion.phase = 2;
+    if (explosion.timer > 38) explosion = null;
+}
+
+function updateSunReaction() {
+    if (SUN.surprisedTimer > 0) SUN.surprisedTimer--;
+
+    if (!banana) return;
+
+    if (distance(banana.x, banana.y, sunX(), sunY()) <= SUN.r + 7) {
+        SUN.surprisedTimer = 45;
+    }
+}
+
+function isPointInCloud(x, y, cloud) {
+    const cx = cloudX(cloud);
+    const cy = cloudY(cloud);
+
+    if (cloud.xRatio < 0.3) {
+        return (
+            distance(x, y, cx, cy) < 28 ||
+            distance(x, y, cx + 30, cy) < 33 ||
+            distance(x, y, cx + 60, cy) < 28
+        );
+    }
+
+    return (
+        distance(x, y, cx, cy) < 21 ||
+        distance(x, y, cx + 25, cy) < 27 ||
+        distance(x, y, cx + 55, cy) < 21
+    );
+}
+
+function startCloudRain(cloud) {
+    cloud.rainTimer = 70;
+    cloud.drops = [];
+
+    const cx = cloudX(cloud);
+    const cy = cloudY(cloud);
+
+    const minX = cloud.xRatio < 0.3 ? cx - 20 : cx - 15;
+    const maxX = cloud.xRatio < 0.3 ? cx + 70 : cx + 65;
+    const baseY = cy + 16;
+
+    for (let i = 0; i < 22; i++) {
+        cloud.drops.push({
+            x: randomInt(Math.round(minX), Math.round(maxX)),
+            y: baseY + randomInt(0, 45),
+            speed: randomInt(3, 7)
+        });
+    }
+}
+
+function updateCloudRain() {
+    CLOUDS.forEach(cloud => {
+        if (cloud.rainTimer > 0) {
+            cloud.rainTimer--;
+
+            cloud.drops.forEach(drop => {
+                drop.y += drop.speed;
+
+                if (drop.y > H) {
+                    drop.y = cloudY(cloud) + 20;
+                }
+            });
+        }
+
+        if (!banana) return;
+
+        if (cloud.rainTimer <= 0 && isPointInCloud(banana.x, banana.y, cloud)) {
+            startCloudRain(cloud);
+        }
+    });
+}
+
+function applyExplosionDamage(x, y) {
+    const r = parseInt($("explosionSize").value);
+
+    explosion = {
+        x,
+        y,
+        r,
+        phase: 0,
+        timer: 0
+    };
+
+    buildings.forEach(building => {
+        const topY = H - building.height;
+
+        if (circleIntersectsRect(x, y, r, building.x, topY, building.width, building.height)) {
+            building.holes.push({
+                x,
+                y,
+                r
+            });
+        }
+    });
+
+    const killed = [];
+
+    gorillas.forEach((g, index) => {
+        if (g.dead) return;
+
+        if (distance(x, y, g.x, g.y) <= r + g.r) {
+            g.dead = true;
+            killed.push(index);
+        }
+    });
+
+    if (killed.length > 0) {
+        const alive = activeGorillas();
+
+        if (alive.length === 1) {
+            endRound("Vyhrála gorila " + (alive[0].index + 1), alive[0].index);
+        } else if (alive.length === 0) {
+            endRound("Všechny gorily zničeny!", null);
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+function checkCollisionWithBuildings(x, y) {
+    for (let i = 0; i < buildings.length; i++) {
+        const building = buildings[i];
+
+        for (const hole of building.holes) {
+            if (distance(x, y, hole.x, hole.y) < hole.r) {
+                return -1;
+            }
+        }
+
+        if (
+            x >= building.x &&
+            x <= building.x + building.width &&
+            y >= H - building.height &&
+            y <= H
+        ) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+function checkCollisionWithAnyGorilla(x, y, ignoreIndex = -1) {
+    for (let i = 0; i < gorillas.length; i++) {
+        if (i === ignoreIndex) continue;
+
+        const g = gorillas[i];
+
+        if (!g.dead && distance(x, y, g.x, g.y) < g.r + 5) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+function updateBanana() {
+    if (!banana || roundOver) return;
+
+    banana.x += banana.vx;
+    banana.y += banana.vy;
+    banana.vy += gravity;
+    banana.rotation += 0.22;
+
+    trajectoryPoints.push({
+        x: banana.x,
+        y: banana.y
+    });
+
+    if (banana.x < 0 || banana.x > W || banana.y > H) {
+        banana = null;
+        switchPlayer();
+        return;
+    }
+
+    const gorillaHit = checkCollisionWithAnyGorilla(banana.x, banana.y);
+
+    if (gorillaHit !== -1) {
+        const ended = applyExplosionDamage(banana.x, banana.y);
+        banana = null;
+
+        if (!ended && !roundOver) {
+            switchPlayer();
+        }
+
+        return;
+    }
+
+    const buildingHit = checkCollisionWithBuildings(banana.x, banana.y);
+
+    if (buildingHit !== -1) {
+        const ended = applyExplosionDamage(banana.x, banana.y);
+        banana = null;
+
+        if (!ended && !roundOver) {
+            switchPlayer();
+        }
+    }
+}
+
+function startThrow(angleDeg, power) {
+    if (roundOver || banana) return;
+    if (!gorillas[currentPlayer] || gorillas[currentPlayer].dead) return;
+
+    angleDeg = clamp(Math.round(angleDeg), -20, 200);
+    power = clamp(Math.round(power), 10, 100);
+
+    lastAngle[currentPlayer] = angleDeg;
+    lastPower[currentPlayer] = power;
+
+    const angleRad = angleDeg * Math.PI / 180;
+    const start = getThrowStartForAngle(angleDeg);
+
+    banana = {
+        x: start.x,
+        y: start.y,
+        vx: Math.cos(angleRad) * power * 0.3,
+        vy: -Math.sin(angleRad) * power * 0.3,
+        rotation: 0
+    };
+
+    trajectoryPoints = [];
+
+    $("status").textContent = "Banán letí...";
+}
+
+function switchPlayer() {
+    if (roundOver) return;
+
+    if (activeGorillas().length <= 1) {
+        const alive = activeGorillas();
+
+        if (alive.length === 1) {
+            endRound("Vyhrála gorila " + (alive[0].index + 1), alive[0].index);
+        } else {
+            endRound("Všechny gorily zničeny!", null);
+        }
+
+        return;
+    }
+
+    do {
+        currentPlayer = (currentPlayer + 1) % gorillas.length;
+    } while (gorillas[currentPlayer].dead);
+
+    $("playerLabel").textContent = currentPlayer + 1;
+
+    setAnglePower(lastAngle[currentPlayer], lastPower[currentPlayer], false);
+    updateSliderColors();
+    resetMouseAim();
+
+    $("status").textContent = "Na tahu je gorila " + (currentPlayer + 1);
+}
+
+function setAnglePower(angle, power, remember = true) {
+    angle = clamp(Math.round(angle), -20, 200);
+    power = clamp(Math.round(power), 10, 100);
+
+    $("angle").value = angle;
+    $("power").value = power;
+    $("angleValue").textContent = angle;
+    $("powerValue").textContent = power;
+
+    $("angleText").value = angle;
+    $("powerText").value = power;
+
+    if (remember) {
+        lastAngle[currentPlayer] = angle;
+        lastPower[currentPlayer] = power;
+    }
+
+    updateSliderColors();
+    updateMouseAimFromValues();
+}
+
+function angleFromPointWithMatchingThrowStart(x, y) {
+    const g = gorillas[currentPlayer];
+    if (!g) return 45;
+
+    const dir = x >= g.x ? 1 : -1;
+    const startX = g.x + dir * 24;
+    const startY = g.y - 24;
+
+    let angle = Math.atan2(startY - y, x - startX) * 180 / Math.PI;
+
+    if (angle < -20) angle += 360;
+
+    return clamp(angle, -20, 200);
+}
+
+function updateAnglePowerFromMouse(x, y) {
+    const g = gorillas[currentPlayer];
+    if (!g || g.dead) return;
+
+    const angle = angleFromPointWithMatchingThrowStart(x, y);
+    const start = getThrowStartForAngle(angle);
+
+    let power = Math.hypot(x - start.x, y - start.y) / 1.7;
+    power = clamp(power, 10, 100);
+
+    setAnglePower(angle, power, true);
+}
+
+function updateMouseAimFromValues() {
+    if (!gorillas[currentPlayer]) return;
+
+    const angle = parseFloat($("angle").value);
+    const power = parseFloat($("power").value);
+    const angleRad = angle * Math.PI / 180;
+    const length = power * 1.7;
+    const start = getThrowStartForAngle(angle);
+
+    mouseAim = {
+        x: start.x + Math.cos(angleRad) * length,
+        y: start.y - Math.sin(angleRad) * length
+    };
+}
+
+function moveMouseAimByKeyboard(dx, dy) {
+    if (banana || roundOver) return;
+
+    if (!mouseAim) {
+        updateMouseAimFromValues();
+    }
+
+    mouseAim.x = clamp(mouseAim.x + dx, 0, W);
+    mouseAim.y = clamp(mouseAim.y + dy, 0, H);
+
+    updateAnglePowerFromMouse(mouseAim.x, mouseAim.y);
+}
+
+function resetMouseAim() {
+    updateMouseAimFromValues();
+}
+
+function getCanvasPoint(event) {
+    const rect = canvas.getBoundingClientRect();
+
+    return {
+        x: (event.clientX - rect.left) * (canvas.width / rect.width),
+        y: (event.clientY - rect.top) * (canvas.height / rect.height)
+    };
+}
+
+function updateRangeFill(input, color) {
+    const min = parseFloat(input.min);
+    const max = parseFloat(input.max);
+    const value = parseFloat(input.value);
+    const percent = ((value - min) / (max - min)) * 100;
+
+    input.style.setProperty("--active-color", color);
+    input.style.accentColor = color;
+
+    input.style.background =
+        "linear-gradient(to right, " +
+        color +
+        " 0%, " +
+        color +
+        " " +
+        percent +
+        "%, #333 " +
+        percent +
+        "%, #333 100%)";
+}
+
+function updateSliderColors() {
+    if (!gorillas[currentPlayer]) return;
+
+    const color = gorillas[currentPlayer].color;
+
+    document.documentElement.style.setProperty("--active-color", color);
+
+    updateRangeFill($("angle"), color);
+    updateRangeFill($("power"), color);
+}
+
+function updateNeutralSettingSliders() {
+    updateRangeFill($("playerCount"), "#cc88ff");
+    updateRangeFill($("buildingCount"), "#8888ff");
+    updateRangeFill($("explosionSize"), "#ffcc00");
+    updateRangeFill($("windowColumns"), "#66ddff");
+    updateRangeFill($("windowSize"), "#55ffaa");
+
+    $("playerCountValue").textContent = $("playerCount").value;
+
+    if (isFullscreen()) {
+        $("buildingCountValue").textContent =
+            $("buildingCount").value + " → " + getEffectiveBuildingCount();
+    } else {
+        $("buildingCountValue").textContent = $("buildingCount").value;
+    }
+
+    $("explosionSizeValue").textContent = $("explosionSize").value;
+    $("windowColumnsValue").textContent = $("windowColumns").value;
+    $("windowSizeValue").textContent = $("windowSize").value;
+}
+
+function recolorBuildings() {
+    buildings.forEach((building, index) => {
+        building.color = getBuildingColor(index);
+    });
+}
+
+function resizeCanvasForMode() {
+    if (isFullscreen()) {
+        W = Math.max(1000, window.innerWidth - 28);
+        H = Math.max(520, window.innerHeight - 330);
+    } else {
+        W = BASE_W;
+        H = BASE_H;
+    }
+
+    canvas.width = Math.round(W);
+    canvas.height = Math.round(H);
+
+    W = canvas.width;
+    H = canvas.height;
+}
+
+function rebuildForSizeChange() {
+    banana = null;
+    explosion = null;
+    trajectoryPoints = [];
+    roundOver = false;
+
+    resizeCanvasForMode();
+    generateBuildings();
+    placeGorillas();
+
+    currentPlayer = 0;
+    $("playerLabel").textContent = currentPlayer + 1;
+
+    setAnglePower(lastAngle[currentPlayer], lastPower[currentPlayer], false);
+    updateNeutralSettingSliders();
+    updateSliderColors();
+    resetMouseAim();
+    drawScene();
+}
+
+function newGame() {
+    banana = null;
+    explosion = null;
+    trajectoryPoints = [];
+    currentPlayer = 0;
+    roundOver = false;
+    SUN.surprisedTimer = 0;
+
+    CLOUDS.forEach(cloud => {
+        cloud.rainTimer = 0;
+        cloud.drops = [];
+    });
+
+    resizeCanvasForMode();
+    generateBuildings();
+    placeGorillas();
+    updateScoreDisplay();
+
+    $("playerLabel").textContent = currentPlayer + 1;
+
+    setAnglePower(lastAngle[currentPlayer], lastPower[currentPlayer], false);
+
+    updateSliderColors();
+    updateNeutralSettingSliders();
+    resetMouseAim();
+
+    $("status").textContent = "Nastav úhel a sílu, posuň terčík nebo stiskni mezerník.";
+
+    drawScene();
+}
+
+function gameLoop() {
+    updateBanana();
+    updateExplosion();
+    updateSunReaction();
+    updateCloudRain();
+    drawScene();
+
+    requestAnimationFrame(gameLoop);
+}
+
+function throwFromKeyboard(event) {
+    if (event.code !== "Space") return;
+
+    const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
+
+    if (tag === "input" || tag === "select" || tag === "button") {
+        return;
+    }
+
+    event.preventDefault();
+
+    if (!banana && !roundOver) {
+        startThrow(parseFloat($("angle").value), parseFloat($("power").value));
+    }
+}
+
+$("angle").addEventListener("input", () => {
+    setAnglePower(parseFloat($("angle").value), parseFloat($("power").value));
+});
+
+$("power").addEventListener("input", () => {
+    setAnglePower(parseFloat($("angle").value), parseFloat($("power").value));
+});
+
+$("angleText").addEventListener("input", () => {
+    setAnglePower(parseFloat($("angleText").value), parseFloat($("powerText").value));
+});
+
+$("powerText").addEventListener("input", () => {
+    setAnglePower(parseFloat($("angleText").value), parseFloat($("powerText").value));
+});
+
+$("throwBtn").addEventListener("click", () => {
+    startThrow(parseFloat($("angle").value), parseFloat($("power").value));
+});
+
+$("resetBtn").addEventListener("click", newGame);
+
+$("fullscreenBtn").addEventListener("click", async () => {
+    if (!document.fullscreenElement) {
+        await $("gameContainer").requestFullscreen();
+    } else {
+        await document.exitFullscreen();
+    }
+});
+
+for (let i = 1; i <= 5; i++) {
+    $("color" + i).addEventListener("input", () => {
+        if (gorillas[i - 1]) {
+            gorillas[i - 1].color = $("color" + i).value;
+        }
+
+        updateSliderColors();
+    });
+}
+
+$("playerCount").addEventListener("input", () => {
+    updateNeutralSettingSliders();
+});
+
+$("playerCount").addEventListener("change", () => {
+    score = [0, 0, 0, 0, 0];
+    newGame();
+});
+
+$("buildingCount").addEventListener("input", () => {
+    updateNeutralSettingSliders();
+});
+
+$("buildingCount").addEventListener("change", () => {
+    newGame();
+});
+
+$("explosionSize").addEventListener("input", () => {
+    updateNeutralSettingSliders();
+});
+
+$("windowColumns").addEventListener("input", () => {
+    updateNeutralSettingSliders();
+});
+
+$("windowColumns").addEventListener("change", () => {
+    newGame();
+});
+
+$("windowSize").addEventListener("input", () => {
+    updateNeutralSettingSliders();
+});
+
+$("windowSize").addEventListener("change", () => {
+    newGame();
+});
+
+$("coloredBuildings").addEventListener("change", () => {
+    recolorBuildings();
+    drawScene();
+});
+
+$("trajectory").addEventListener("change", () => {
+    drawScene();
+});
+
+canvas.addEventListener("pointerdown", event => {
+    if (banana || roundOver) return;
+
+    draggingAim = true;
+    canvas.focus();
+    canvas.setPointerCapture(event.pointerId);
+
+    const p = getCanvasPoint(event);
+    updateAnglePowerFromMouse(p.x, p.y);
+});
+
+canvas.addEventListener("pointermove", event => {
+    if (!draggingAim) return;
+
+    const p = getCanvasPoint(event);
+    updateAnglePowerFromMouse(p.x, p.y);
+});
+
+canvas.addEventListener("pointerup", event => {
+    draggingAim = false;
+
+    try {
+        canvas.releasePointerCapture(event.pointerId);
+    } catch (e) {}
+});
+
+canvas.addEventListener("pointercancel", () => {
+    draggingAim = false;
+});
+
+document.addEventListener("keydown", event => {
+    const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
+
+    if (tag !== "input" && tag !== "select" && tag !== "button") {
+        const fast = event.shiftKey ? 10 : 4;
+
+        if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            moveMouseAimByKeyboard(-fast, 0);
+            return;
+        }
+
+        if (event.key === "ArrowRight") {
+            event.preventDefault();
+            moveMouseAimByKeyboard(fast, 0);
+            return;
+        }
+
+        if (event.key === "ArrowUp") {
+            event.preventDefault();
+            moveMouseAimByKeyboard(0, -fast);
+            return;
+        }
+
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            moveMouseAimByKeyboard(0, fast);
+            return;
+        }
+    }
+
+    throwFromKeyboard(event);
+});
+
+document.addEventListener("fullscreenchange", () => {
+    $("fullscreenBtn").textContent = isFullscreen() ? "Ukončit celou obrazovku" : "Celá obrazovka";
+    rebuildForSizeChange();
+});
+
+window.addEventListener("resize", () => {
+    if (isFullscreen()) {
+        rebuildForSizeChange();
+    }
+});
+
+newGame();
+gameLoop();
+</script>
+
+</body>
+</html>
