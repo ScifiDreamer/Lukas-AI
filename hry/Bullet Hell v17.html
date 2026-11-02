@@ -34,6 +34,9 @@
         applyDefault();
         localStorage.setItem('LukasBulletHellDefaultPresetV17','1');
       }
+      // Populate the settings inputs on every load so they are ready before
+      // opening the settings panel or selecting a quick preset.
+      controls();
       // Boss drops can force rare items in the original game. This preset replaces
       // that behavior so every dropped pickup is a regular upgrade.
       addPickup=function(X,Y){
