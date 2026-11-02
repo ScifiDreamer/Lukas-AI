@@ -13,12 +13,8 @@
   <script>
     const frame=document.getElementById('game');
     const presetScript=`(()=>{
-      const preset={bulletSpeed:1000,fireRate:33,magnet:true,maxPower:100,shotAngle:15,enemyRate:10,spread:99,rareChance:0};
-      const applyDefault=()=>{
-        Object.assign(cfg,preset);
-        controls();
-        localStorage.LukasBulletHellCfg=JSON.stringify(cfg);
-      };
+      const defaultPreset={bulletSpeed:1000,fireRate:33,magnet:true,maxPower:100,shotAngle:15,enemyRate:10,spread:99,rareChance:0};
+      presets.default={...defs,...defaultPreset};
       const presetBar=document.querySelector('.presets');
       if(presetBar&&!presetBar.querySelector('[data-pre="default"]')){
         const button=document.createElement('button');
@@ -26,46 +22,14 @@
         button.dataset.pre='default';
         button.textContent='DEFAULT';
         button.title='Bullet hell bez vzácných power-upů';
-        button.onclick=applyDefault;
+        button.onclick=()=>{
+          cfg={...presets.default};
+          controls();
+        };
         presetBar.prepend(button);
       }
-      if(!localStorage.getItem('LukasBulletHellDefaultPresetV17')){
-        applyDefault();
-        localStorage.setItem('LukasBulletHellDefaultPresetV17','1');
-      }
-      // Make sure every settings section has its controls before the user opens it.
-      // Retry briefly as a safeguard against slower page initialization.
-      let attempts=0;
-      const initializeSettings=()=>{
-        if(typeof controls==='function'&&typeof groups==='object'){
-          controls();
-          const missing=Object.keys(groups).some(id=>!document.querySelector('#'+id+' .ctrl'));
-          if(missing&&attempts++<20){setTimeout(initializeSettings,50);return}
-          const showSettings=()=>{
-            controls();
-            applyLanguage();
-            document.querySelector('#settings').classList.remove('hide');
-          };
-          // Rebuild controls at the moment each settings entry point is used.
-          ['#configure','#gear','#pauseOptions'].forEach(selector=>{
-            const button=document.querySelector(selector);
-            if(button)button.addEventListener('click',()=>setTimeout(()=>{
-              if(document.querySelector('#settings').classList.contains('hide'))return;
-              controls();
-              applyLanguage();
-            },0));
-          });
-        }else if(attempts++<20){setTimeout(initializeSettings,50)}
-      };
-      initializeSettings();
-      addPickup=function(X,Y){
-        const pool=cfg.adaptivePowerUps?normalUpgradeTypes:['power'];
-        let type=pool[Math.floor(Math.random()*pool.length)];
-        if(type==='power'&&G.power>=cfg.maxPower)
-          type=cfg.adaptivePowerUps?normalUpgradeTypes[1+Math.floor(Math.random()*3)]:null;
-        if(!type)return;
-        G.u.push({x:X,y:Y,r:cfg.pickupSize,a:0,type});
-      };
+      if(!localStorage.getItem('LukasBulletHellCfg'))
+        cfg={...presets.default};
     })()`;
     frame.addEventListener('load',()=>{
       try{frame.contentWindow.eval(presetScript)}
