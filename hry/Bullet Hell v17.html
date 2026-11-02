@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lukášův Bullet Hell · Default</title>
+  <style>
+    *{box-sizing:border-box}html,body,iframe{width:100%;height:100%;margin:0;border:0;display:block;overflow:hidden;background:#030712}
+  </style>
+</head>
+<body>
+  <iframe id="game" title="Lukášův Bullet Hell" src="Bullet%20Hell%20v16.html"></iframe>
+  <script>
+    const frame=document.getElementById('game');
+    const presetScript=`(()=>{
+      const preset={bulletSpeed:1000,fireRate:33,magnet:true,maxPower:100,shotAngle:15,enemyRate:10,spread:99,rareChance:0};
+      const applyDefault=()=>{
+        Object.assign(cfg,preset);
+        controls();
+        localStorage.LukasBulletHellCfg=JSON.stringify(cfg);
+      };
+      const presetBar=document.querySelector('.presets');
+      if(presetBar&&!presetBar.querySelector('[data-pre="default"]')){
+        const button=document.createElement('button');
+        button.type='button';
+        button.dataset.pre='default';
+        button.textContent='DEFAULT';
+        button.title='Bullet hell bez vzácných power-upů';
+        button.onclick=applyDefault;
+        presetBar.prepend(button);
+      }
+      // Set the new default once; subsequent visits keep the player's saved settings.
+      if(!localStorage.getItem('LukasBulletHellDefaultPresetV17')){
+        applyDefault();
+        localStorage.setItem('LukasBulletHellDefaultPresetV17','1');
+      }
+      // Boss drops can force rare items in the original game. This preset replaces
+      // that behavior so every dropped pickup is a regular upgrade.
+      addPickup=function(X,Y){
+        const pool=cfg.adaptivePowerUps?normalUpgradeTypes:['power'];
+        let type=pool[Math.floor(Math.random()*pool.length)];
+        if(type==='power'&&G.power>=cfg.maxPower)
+          type=cfg.adaptivePowerUps?normalUpgradeTypes[1+Math.floor(Math.random()*3)]:null;
+        if(!type)return;
+        G.u.push({x:X,y:Y,r:cfg.pickupSize,a:0,type});
+      };
+    })()`;
+    frame.addEventListener('load',()=>{
+      try{frame.contentWindow.eval(presetScript)}
+      catch(error){console.error('Default preset could not be installed:',error)}
+    });
+  </script>
+</body>
+</html>
