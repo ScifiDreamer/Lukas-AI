@@ -29,16 +29,35 @@
         button.onclick=applyDefault;
         presetBar.prepend(button);
       }
-      // Set the new default once; subsequent visits keep the player's saved settings.
       if(!localStorage.getItem('LukasBulletHellDefaultPresetV17')){
         applyDefault();
         localStorage.setItem('LukasBulletHellDefaultPresetV17','1');
       }
-      // Populate the settings inputs on every load so they are ready before
-      // opening the settings panel or selecting a quick preset.
-      controls();
-      // Boss drops can force rare items in the original game. This preset replaces
-      // that behavior so every dropped pickup is a regular upgrade.
+      // Make sure every settings section has its controls before the user opens it.
+      // Retry briefly as a safeguard against slower page initialization.
+      let attempts=0;
+      const initializeSettings=()=>{
+        if(typeof controls==='function'&&typeof groups==='object'){
+          controls();
+          const missing=Object.keys(groups).some(id=>!document.querySelector('#'+id+' .ctrl'));
+          if(missing&&attempts++<20){setTimeout(initializeSettings,50);return}
+          const showSettings=()=>{
+            controls();
+            applyLanguage();
+            document.querySelector('#settings').classList.remove('hide');
+          };
+          // Rebuild controls at the moment each settings entry point is used.
+          ['#configure','#gear','#pauseOptions'].forEach(selector=>{
+            const button=document.querySelector(selector);
+            if(button)button.addEventListener('click',()=>setTimeout(()=>{
+              if(document.querySelector('#settings').classList.contains('hide'))return;
+              controls();
+              applyLanguage();
+            },0));
+          });
+        }else if(attempts++<20){setTimeout(initializeSettings,50)}
+      };
+      initializeSettings();
       addPickup=function(X,Y){
         const pool=cfg.adaptivePowerUps?normalUpgradeTypes:['power'];
         let type=pool[Math.floor(Math.random()*pool.length)];
