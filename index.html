@@ -57,8 +57,8 @@
   const state={all:[],category:'hry',query:'',page:1,perPage:12};
   const el={main:document.querySelector('#main'),search:document.querySelector('#search'),status:document.querySelector('#status'),prev:document.querySelector('#prev'),next:document.querySelector('#next'),pageInfo:document.querySelector('#pageInfo'),shown:document.querySelector('#shown'),gamesCount:document.querySelector('#gamesCount'),toolsCount:document.querySelector('#toolsCount')};
 
-  function category(path){const first=path.split('/')[0].toLocaleLowerCase('cs');if(first==='hry')return'hry';if(first==='utilitky'||first==='utilityky'||first==='utility')return'utilitky';return null}
-  function label(path){const file=path.split('/').pop().replace(/\.html?$/i,'');return file.replace(/[-_]+/g,' ').replace(/\s+v\d+(?:[.\s_-]\d+)*\s*$/i,'').replace(/\s+/g,' ').trim()}
+  function category(path){const first=path.split('/')[0].toLocaleLowerCase('cs');if(first==='hry')return'hry';if(first==='utilitky'||first==='utilityky'||first==='utility'||first==='mubea')return'utilitky';return null}
+  function label(path){const parts=path.split('/'),root=parts[0].toLocaleLowerCase('cs'),file=parts.pop().replace(/\.html?$/i,''),name=file.replace(/[-_]+/g,' ').replace(/\s+v\d+(?:[.\s_-]\d+)*\s*$/i,'').replace(/\s+/g,' ').trim(),folder=(root==='hry'||root==='utilitky'||root==='utilityky'||root==='utility')?parts.slice(1).join(' / '):parts.join(' / ');return folder?`${folder} · ${name}`:name}
   function href(path){return PAGES+path.split('/').map(encodeURIComponent).join('/')}
   function recalcPerPage(){const w=innerWidth,h=innerHeight;const cols=w<=650?2:w<=980?3:5;const rows=h<=560?2:h<=720?3:4;state.perPage=cols*rows}
   function filtered(){return state.all.filter(x=>x.category===state.category&&x.name.toLocaleLowerCase('cs').includes(state.query))}
