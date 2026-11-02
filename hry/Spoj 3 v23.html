@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Match-3 v23</title>
+<style>
+  html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden;font-family:Arial,sans-serif;touch-action:none}
+  canvas{display:block}
+  #hud{position:fixed;left:0;right:0;bottom:10px;text-align:center;color:#fff;pointer-events:none;text-shadow:0 1px 4px #000}
+  #score{font-size:28px;font-weight:bold}
+  #lastMove{margin-top:4px;font-size:20px;font-weight:bold}
+  #history{margin-top:3px;font-size:16px;line-height:1.25}
+  #history div:nth-child(1){opacity:.72}
+  #history div:nth-child(2){opacity:.42}
+  #history div:nth-child(3){opacity:.18}
+  #maximum{margin-top:3px;font-size:17px;color:#ffd54a;font-weight:bold}
+
+  #settingsWrap{position:fixed;top:10px;right:10px;z-index:10;touch-action:auto}
+  #settingsButton,#deleteButton,#aiButton{display:block;width:46px;height:46px;margin-bottom:8px;border:1px solid #666;border-radius:12px;background:rgba(30,30,30,.92);color:#fff;font-size:25px;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.45)}
+  #deleteButton.active{background:#a12424;border-color:#ff7777}#aiButton.active{background:#176b39;border-color:#69e89a}
+  #settingsButton:active{transform:scale(.96)}
+  #settingsPanel{display:none;position:absolute;top:54px;right:0;width:min(330px,calc(100vw - 20px));max-height:calc(100vh - 76px);overflow-y:auto;box-sizing:border-box;padding:15px 16px 12px;border:1px solid #666;border-radius:14px;background:rgba(25,25,25,.97);color:#fff;box-shadow:0 8px 28px rgba(0,0,0,.65)}
+  #settingsPanel.open{display:block}
+  @media (min-width:769px) and (hover:hover){#settingsPanel.open{display:block}#settingsPanel{max-height:calc(100vh - 74px)}}
+  #gameTitle{margin:0 0 5px;text-align:center;font-size:22px;font-weight:bold;color:#ffd54a;text-shadow:0 1px 4px #000}
+  #settingsPanel h2{font-size:19px;margin:0 0 13px}
+  .setting{margin:12px 0}
+  .setting label{display:flex;justify-content:space-between;gap:12px;margin-bottom:7px;font-size:15px}
+  .setting output{color:#ffd54a;font-weight:bold}
+  .setting input{width:100%;accent-color:#ffd54a}
+  #settingsHint{margin-top:10px;font-size:12px;line-height:1.35;color:#aaa}
+  #paletteTitle{margin:17px 0 8px;font-size:15px;font-weight:bold}
+  #paletteEditor{display:grid;gap:7px}
+  .colorRow{display:grid;grid-template-columns:28px 42px 1fr 34px 34px;align-items:center;gap:6px;padding:5px 6px;border:1px solid #4b4b4b;border-radius:9px;background:#202020}
+  .colorIndex{text-align:center;color:#ffd54a;font-weight:bold}
+  .colorPicker{width:38px;height:30px;padding:0;border:0;border-radius:5px;background:transparent;cursor:pointer}
+  .colorHex{min-width:0;padding:7px;border:1px solid #555;border-radius:6px;background:#111;color:#fff;font:12px monospace;text-transform:uppercase}
+  .moveColor{height:30px;padding:0;border:1px solid #666;border-radius:6px;background:#383838;color:#fff;font-size:16px;cursor:pointer}
+  .moveColor:disabled{opacity:.25;cursor:default}
+  .optionRow{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:13px 0;font-size:15px}
+  .optionRow input[type=checkbox]{width:22px;height:22px;accent-color:#ffd54a}.optionRow select{padding:8px 10px;border:1px solid #666;border-radius:7px;background:#111;color:#fff;font-weight:bold}
+  .backgroundPicker{width:52px;height:34px;padding:0;border:1px solid #666;border-radius:7px;background:transparent;cursor:pointer}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="settingsWrap">
+  <button id="settingsButton" type="button" aria-label="Otevřít nastavení" aria-expanded="false">⚙</button>
+  <button id="deleteButton" type="button" aria-label="Smazat kuličku" title="Smazat kuličku">🧨</button>
+  <button id="aiButton" type="button" aria-label="Spustit AI hru" title="Spustit AI hru">AI</button>
+  <div id="settingsPanel">
+    <div id="gameTitle">Lukášův Match 3 v23</div>
+    <h2 data-i18n="settings">Nastavení hry</h2>
+    <div class="optionRow"><label for="languageSelect" data-i18n="language">Jazyk</label><select id="languageSelect"><option value="cs">Čeština</option><option value="en">English</option></select></div>
+    <div class="setting">
+      <label for="colorsRange"><span data-i18n="colors">Počet barev</span><output id="colorsValue">5</output></label>
+      <input id="colorsRange" type="range" min="3" max="8" value="5" step="1">
+    </div>
+    <div class="setting">
+      <label for="colsRange"><span data-i18n="cols">Počet sloupečků</span><output id="colsValue">8</output></label>
+      <input id="colsRange" type="range" min="3" max="33" value="8" step="1">
+    </div>
+    <div class="setting">
+      <label for="rowsRange"><span data-i18n="rows">Počet řádků</span><output id="rowsValue">12</output></label>
+      <input id="rowsRange" type="range" min="3" max="33" value="12" step="1">
+    </div>
+    <div class="setting">
+      <label for="boardWidthRange"><span data-i18n="width">Šířka hry</span><output id="boardWidthValue">100 %</output></label>
+      <input id="boardWidthRange" type="range" min="10" max="100" value="100" step="5">
+    </div>
+    <div class="setting">
+      <label for="disappearDelay"><span data-i18n="delay">Prodleva před zmizením</span><output id="disappearDelayValue">0,2 s</output></label>
+      <input id="disappearDelay" type="range" min="0" max="2" value="0.2" step="0.1">
+    </div>
+    <div class="optionRow">
+      <label for="blinkEnabled" data-i18n="blink">Blikání před zmizením</label>
+      <input id="blinkEnabled" type="checkbox" checked>
+    </div>
+    <div class="optionRow">
+      <label for="blinkColor" data-i18n="blinkColor">Barva blikání</label>
+      <input id="blinkColor" class="backgroundPicker" type="color" value="#FFFFFF">
+    </div>
+    <div class="setting">
+      <label for="blinkFrequency"><span data-i18n="frequency">Frekvence blikání</span><output id="blinkFrequencyValue">0 Hz</output></label>
+      <input id="blinkFrequency" type="range" min="0" max="5" value="0" step="0.1">
+    </div>
+    <div class="optionRow">
+      <label for="specialsEnabled" data-i18n="specials">Funkční kolečka</label>
+      <input id="specialsEnabled" type="checkbox" checked>
+    </div>
+    <div class="optionRow">
+      <label for="balls3dEnabled" data-i18n="balls3d">3D vzhled kuliček</label>
+      <input id="balls3dEnabled" type="checkbox">
+    </div>
+    <div class="optionRow">
+      <label for="colorSchemeSelect" data-i18n="colorScheme">Barevné schéma</label>
+      <select id="colorSchemeSelect"></select>
+    </div>
+    <div class="optionRow">
+      <label for="backgroundColor" data-i18n="background">Barva pozadí</label>
+      <input id="backgroundColor" class="backgroundPicker" type="color" value="#000000">
+    </div>
+    <div id="paletteTitle" data-i18n="palette">Barvy a jejich pořadí</div>
+    <div id="paletteEditor"></div>
+    <div id="settingsHint" data-i18n="hint">Prodlevu před zmizením, blikání, jeho barvu a frekvenci lze nastavit výše. Při 0 Hz kolečka po celou prodlevu souvisle svítí zvolenou barvou. Funkční kolečka lze společně zapnout nebo vypnout. Dvě funkční kolečka lze vzájemně prohodit a spojit jejich účinky. Pruhované kolečko vzniká přesně na poli výměny, které je součástí vytvořené čtveřice a při každém odstranění — včetně běžné trojice — vyčistí celý řádek nebo sloupec. Prostorová bomba vzniklá z T/L spojení odstraní oblast 3 × 3. Zobrazené jsou právě používané barvy. Barvu upravíš kliknutím na vzorek nebo zadáním HEX kódu; šipkami změníš pořadí. Změna počtu, pořadí nebo barvy vytvoří novou plochu.</div>
+  </div>
+</div>
+<div id="hud"><div id="score"></div><div id="lastMove">Poslední tah: 0</div><div id="history"></div><div id="maximum">Maximum za 1 tah: 0</div></div>
+<script>
+let ROWS=12, COLS=8, COLOR_COUNT=5, BOARD_WIDTH=Number(localStorage.getItem('match3-board-width')||100), LANGUAGE=localStorage.getItem('match3-language')||'cs', SPECIALS_ENABLED=true, BALLS_3D=localStorage.getItem('match3-balls-3d')==='true', BACKGROUND_COLOR='#000000', DISAPPEAR_DELAY_MS=200, BLINK_ENABLED=true, BLINK_COLOR='#FFFFFF', BLINK_FREQUENCY=0;
+const COLOR_SCHEMES={
+  classic:{cs:'Klasické drahokamy',en:'Classic gems',colors:['#FAD246','#4682E6','#E64646','#50C878','#B45AC8','#FF8C37','#37D2D7','#F569AF']},
+  candy:{cs:'Bonbónové',en:'Candy',colors:['#FF4F81','#FFD23F','#45D6A4','#6C8CFF','#B768E8','#FF8A3D','#36CFE3','#F7F06D']},
+  ocean:{cs:'Oceán',en:'Ocean',colors:['#00B4D8','#0077B6','#48CAE4','#023E8A','#2EC4B6','#90E0EF','#5E60CE','#72EFDD']},
+  sunset:{cs:'Západ slunce',en:'Sunset',colors:['#FFB703','#FB8500','#FF5A5F','#E63973','#9B5DE5','#F15BB5','#FEE440','#F77F00']},
+  forest:{cs:'Les',en:'Forest',colors:['#70E000','#38B000','#008000','#2D6A4F','#95D5B2','#DDA15E','#BC6C25','#588157']},
+  neon:{cs:'Neonová noc',en:'Neon night',colors:['#39FF14','#FF10F0','#00F5FF','#FFF01F','#7B2CFF','#FF3131','#00FF9F','#FF6EC7']},
+  pastel:{cs:'Jemné pastely',en:'Soft pastels',colors:['#FFD6E0','#CDEAC0','#BDE0FE','#E2C2FF','#FFF1B6','#FFC8A2','#A8E6E6','#F8BBD0']},
+  autumn:{cs:'Podzim',en:'Autumn',colors:['#E85D04','#F48C06','#FAA307','#DC2F02','#9D0208','#6A994E','#BC6C25','#FFBA08']},
+  ice:{cs:'Ledové krystaly',en:'Ice crystals',colors:['#CAF0F8','#90E0EF','#48CAE4','#00B4D8','#A9DEF9','#E4C1F9','#B8C0FF','#64DFDF']},
+  royal:{cs:'Královské',en:'Royal',colors:['#FFD700','#6A0DAD','#0047AB','#C41E3A','#008B8B','#FF7F50','#7FFF00','#DA70D6']}
+};
+let ACTIVE_SCHEME=localStorage.getItem('match3-color-scheme')||'classic';
+if(!COLOR_SCHEMES[ACTIVE_SCHEME])ACTIVE_SCHEME='classic';
+let ALL_COLORS=[...COLOR_SCHEMES[ACTIVE_SCHEME].colors];
+const SWAP_MS=220, FALL_MS=330;
+const canvas=document.getElementById('game'), ctx=canvas.getContext('2d'), score=document.getElementById('score');
+const lastMoveEl=document.getElementById('lastMove'), historyEl=document.getElementById('history'), maximumEl=document.getElementById('maximum');
+const settingsButton=document.getElementById('settingsButton'), deleteButton=document.getElementById('deleteButton'), aiButton=document.getElementById('aiButton'), settingsPanel=document.getElementById('settingsPanel');
+const colorsRange=document.getElementById('colorsRange'), colsRange=document.getElementById('colsRange'), rowsRange=document.getElementById('rowsRange'), specialsEnabled=document.getElementById('specialsEnabled'), balls3dEnabled=document.getElementById('balls3dEnabled'), backgroundColor=document.getElementById('backgroundColor');
+const colorsValue=document.getElementById('colorsValue'), colsValue=document.getElementById('colsValue'), rowsValue=document.getElementById('rowsValue'), paletteEditor=document.getElementById('paletteEditor'), languageSelect=document.getElementById('languageSelect'), colorSchemeSelect=document.getElementById('colorSchemeSelect'), boardWidthRange=document.getElementById('boardWidthRange'), boardWidthValue=document.getElementById('boardWidthValue');
+const disappearDelay=document.getElementById('disappearDelay'), disappearDelayValue=document.getElementById('disappearDelayValue'), blinkEnabled=document.getElementById('blinkEnabled'), blinkColor=document.getElementById('blinkColor'), blinkFrequency=document.getElementById('blinkFrequency'), blinkFrequencyValue=document.getElementById('blinkFrequencyValue');
+let W,H,TILE,BOARD_LEFT,TOP=18;
+const BOARD_TOP=70,BOARD_BOTTOM=125;
+let triples=0,quads=0,quints=0;
+let lastMoveScore=0, moveHistory=[], maxMoveScore=0;
+let grid=[], pieces=[], animation=null, busy=false, start=null, removalFlash=null, deleteMode=false, AI_ENABLED=false, aiTimer=null;
+
+const I18N={
+cs:{settings:'Nastavení hry',language:'Jazyk',colors:'Počet barev',cols:'Počet sloupečků',rows:'Počet řádků',width:'Šířka hry',delay:'Prodleva před zmizením',blink:'Blikání před zmizením',blinkColor:'Barva blikání',frequency:'Frekvence blikání',specials:'Funkční kolečka',balls3d:'3D vzhled kuliček',colorScheme:'Barevné schéma',background:'Barva pozadí',palette:'Barvy a jejich pořadí',hint:'Prodlevu před zmizením, blikání, jeho barvu a frekvenci lze nastavit výše. Při 0 Hz kolečka po celou prodlevu souvisle svítí zvolenou barvou. Funkční kolečka lze společně zapnout nebo vypnout. Dvě funkční kolečka lze vzájemně prohodit a spojit jejich účinky. Pruhované kolečko vyčistí celý řádek nebo sloupec. Prostorová bomba odstraní oblast 3 × 3. Barvu upravíš kliknutím na vzorek nebo zadáním HEX kódu; šipkami změníš pořadí.',last:'Poslední tah',previous:'předchozí tah',maximum:'Maximum za 1 tah',open:'Otevřít nastavení',color:'Barva',up:'Posunout barvu nahoru',down:'Posunout barvu dolů',deleteBall:'Smazat kuličku',aiStart:'Spustit AI hru',aiStop:'Zastavit AI hru'},
+en:{settings:'Game settings',language:'Language',colors:'Number of colors',cols:'Number of columns',rows:'Number of rows',width:'Game width',delay:'Delay before disappearing',blink:'Blink before disappearing',blinkColor:'Blink color',frequency:'Blink frequency',specials:'Special pieces',balls3d:'3D ball appearance',colorScheme:'Color scheme',background:'Background color',palette:'Colors and their order',hint:'You can set the delay before disappearing, blinking, its color, and frequency above. At 0 Hz, pieces glow continuously in the selected color during the delay. Special pieces can be enabled or disabled together. Two special pieces can be swapped to combine their effects. A striped piece clears an entire row or column. An area bomb removes a 3 × 3 area. Change a color by clicking its swatch or entering a HEX code; use the arrows to change the order.',last:'Last move',previous:'previous move',maximum:'Maximum in 1 move',open:'Open settings',color:'Color',up:'Move color up',down:'Move color down',deleteBall:'Delete a ball',aiStart:'Start AI play',aiStop:'Stop AI play'}};
+const tr=k=>I18N[LANGUAGE][k];
+function renderColorSchemes(){colorSchemeSelect.innerHTML=Object.entries(COLOR_SCHEMES).map(([key,scheme])=>`<option value="${key}">${scheme[LANGUAGE]}</option>`).join('');colorSchemeSelect.value=ACTIVE_SCHEME;}
+function applyLanguage(){document.documentElement.lang=LANGUAGE;languageSelect.value=LANGUAGE;document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=tr(el.dataset.i18n));settingsButton.setAttribute('aria-label',tr('open'));deleteButton.setAttribute('aria-label',tr('deleteBall'));deleteButton.title=tr('deleteBall');aiButton.setAttribute('aria-label',AI_ENABLED?tr('aiStop'):tr('aiStart'));aiButton.title=AI_ENABLED?tr('aiStop'):tr('aiStart');updateMoveTexts();renderColorSchemes();renderPaletteEditor();}
+function updateMoveTexts(){lastMoveEl.textContent=`${tr('last')}: ${lastMoveScore}`;historyEl.innerHTML=moveHistory.slice(1).map((n,i)=>`<div>${i+1}. ${tr('previous')}: ${n}</div>`).join('');maximumEl.textContent=`${tr('maximum')}: ${maxMoveScore}`;}
+function normalizeHex(value){
+  value=value.trim().toUpperCase();
+  if(!value.startsWith('#'))value='#'+value;
+  return /^#[0-9A-F]{6}$/.test(value)?value:null;
+}
+function renderPaletteEditor(){
+  paletteEditor.innerHTML='';
+  ALL_COLORS.slice(0,COLOR_COUNT).forEach((color,index)=>{
+    const row=document.createElement('div');row.className='colorRow';
+    row.innerHTML=`<span class="colorIndex">${index+1}</span><input class="colorPicker" type="color" value="${color}" aria-label="${tr('color')} ${index+1}"><input class="colorHex" value="${color}" maxlength="7" aria-label="HEX ${tr('color').toLowerCase()} ${index+1}"><button class="moveColor" data-dir="-1" ${index===0?'disabled':''} aria-label="${tr('up')}">↑</button><button class="moveColor" data-dir="1" ${index===COLOR_COUNT-1?'disabled':''} aria-label="${tr('down')}">↓</button>`;
+    const picker=row.querySelector('.colorPicker'),hex=row.querySelector('.colorHex');
+    picker.addEventListener('input',()=>{ALL_COLORS[index]=picker.value.toUpperCase();hex.value=ALL_COLORS[index];init(true);});
+    hex.addEventListener('change',()=>{const valid=normalizeHex(hex.value);if(valid){ALL_COLORS[index]=valid;picker.value=valid;hex.value=valid;init(true);}else hex.value=ALL_COLORS[index];});
+    row.querySelectorAll('.moveColor').forEach(button=>button.addEventListener('click',()=>{
+      const other=index+Number(button.dataset.dir);[ALL_COLORS[index],ALL_COLORS[other]]=[ALL_COLORS[other],ALL_COLORS[index]];renderPaletteEditor();init(true);
+    }));
+    paletteEditor.appendChild(row);
+  });
+}
+function randomColor(){return Math.floor(Math.random()*COLOR_COUNT);}
+function resize(){
+  W=innerWidth; H=innerHeight;
+  const dpr=devicePixelRatio||1;
+  canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const availableWidth=W*BOARD_WIDTH/100;
+  const availableHeight=Math.max(30,H-BOARD_TOP-BOARD_BOTTOM);
+  TILE=Math.max(1,Math.min(availableWidth/COLS,availableHeight/ROWS));
+  BOARD_LEFT=(W-TILE*COLS)/2;
+  TOP=BOARD_TOP+(availableHeight-TILE*ROWS)/2;
+}
+addEventListener('resize',resize); resize();
+function colorPiece(color,row,col,fromRow=row,special=null){return {color,row,col,fromRow,special};}
+function resetStats(){
+  triples=quads=quints=0; lastMoveScore=0; moveHistory=[]; maxMoveScore=0;
+  lastMoveEl.textContent=`${tr('last')}: 0`; historyEl.innerHTML=''; maximumEl.textContent=`${tr('maximum')}: 0`;
+}
+function init(resetScore=false){
+  animation=null; removalFlash=null; busy=false; start=null;
+  if(resetScore)resetStats();
+  grid=Array.from({length:ROWS},()=>Array.from({length:COLS},randomColor));
+  removeInitialMatches(); syncPieces();
+}
+function removeInitialMatches(){
+  while(true){const m=findMatches(); if(!m.length)return; for(const [r,c] of m)grid[r][c]=randomColor();}
+}
+function syncPieces(){pieces=[];for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)pieces.push(colorPiece(grid[r][c],r,c));}
+function ease(t){return 1-Math.pow(1-t,3);}
+function center(row,col){return{x:BOARD_LEFT+col*TILE+TILE/2,y:TOP+row*TILE+TILE/2};}
+function ballFill(base,x,y,radius){
+  if(!BALLS_3D)return base;
+  const gradient=ctx.createRadialGradient(x-radius*.38,y-radius*.42,radius*.06,x,y,radius*1.08);
+  gradient.addColorStop(0,'rgba(255,255,255,.98)');gradient.addColorStop(.18,base);gradient.addColorStop(.62,base);gradient.addColorStop(1,'rgba(0,0,0,.92)');
+  return gradient;
+}
+function addBallShine(x,y,radius){
+  if(!BALLS_3D)return;
+  const shine=ctx.createRadialGradient(x-radius*.34,y-radius*.39,0,x-radius*.34,y-radius*.39,radius*.46);
+  shine.addColorStop(0,'rgba(255,255,255,.7)');shine.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=shine;ctx.beginPath();ctx.arc(x,y,radius*.96,0,Math.PI*2);ctx.fill();
+}
+function circle(color,x,y,special=null,overrideColor=null){
+  const radius=Math.max(2,TILE/2-Math.max(1.5,TILE*.045));
+  if(overrideColor){ctx.fillStyle=ballFill(overrideColor,x,y,radius);ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();addBallShine(x,y,radius);return;}
+  if(special==='bomb'){
+    ctx.fillStyle=ballFill('#242424',x,y,radius);ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();addBallShine(x,y,radius);
+    ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(1,TILE*.035);ctx.stroke();
+    for(let i=0;i<8;i++){const a=i*Math.PI/4,rr=radius*.55,sr=Math.max(1.5,radius*.13),sx=x+Math.cos(a)*rr,sy=y+Math.sin(a)*rr;ctx.fillStyle=ballFill(ALL_COLORS[i%COLOR_COUNT],sx,sy,sr);ctx.beginPath();ctx.arc(sx,sy,sr,0,Math.PI*2);ctx.fill();}
+    return;
+  }
+  if(special==='area'){
+    ctx.fillStyle=ballFill(ALL_COLORS[color],x,y,radius);ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();addBallShine(x,y,radius);
+    ctx.fillStyle='rgba(20,20,20,.82)';ctx.beginPath();ctx.arc(x,y,radius*.52,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(1.5,TILE*.04);ctx.beginPath();ctx.arc(x,y,radius*.72,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='#fff';for(let yy=-1;yy<=1;yy++)for(let xx=-1;xx<=1;xx++){ctx.beginPath();ctx.arc(x+xx*radius*.24,y+yy*radius*.24,Math.max(1,radius*.055),0,Math.PI*2);ctx.fill();}
+    return;
+  }
+  ctx.fillStyle=ballFill(ALL_COLORS[color],x,y,radius);ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();addBallShine(x,y,radius);
+  if(special==='row'||special==='col'){
+    ctx.save();ctx.beginPath();ctx.arc(x,y,radius*.9,0,Math.PI*2);ctx.clip();ctx.strokeStyle='rgba(255,255,255,.92)';ctx.lineWidth=Math.max(2,TILE*.09);
+    for(let d=-radius;d<=radius;d+=Math.max(5,TILE*.22)){ctx.beginPath();if(special==='row'){ctx.moveTo(x-radius,y+d);ctx.lineTo(x+radius,y+d);}else{ctx.moveTo(x+d,y-radius);ctx.lineTo(x+d,y+radius);}ctx.stroke();}
+    ctx.restore();
+  }
+}
+function flashingColor(p,now){
+  if(!removalFlash||!removalFlash.cells.has(p.row+','+p.col)||!BLINK_ENABLED)return null;
+  if(BLINK_FREQUENCY<=0)return BLINK_COLOR;
+  const phase=Math.floor((now-removalFlash.start)*BLINK_FREQUENCY*2/1000);
+  return phase%2===0?BLINK_COLOR:null;
+}
+function draw(){
+  ctx.fillStyle=BACKGROUND_COLOR;ctx.fillRect(0,0,W,H);
+  const now=performance.now();
+  if(animation?.type==='swap'){
+    const t=Math.min(1,(now-animation.start)/SWAP_MS),k=ease(t);
+    for(const p of pieces){
+      let{x,y}=center(p.row,p.col);
+      if(p===animation.a){const q=center(animation.toA.r,animation.toA.c),z=center(animation.fromA.r,animation.fromA.c);x=z.x+(q.x-z.x)*k;y=z.y+(q.y-z.y)*k;}
+      else if(p===animation.b){const q=center(animation.toB.r,animation.toB.c),z=center(animation.fromB.r,animation.fromB.c);x=z.x+(q.x-z.x)*k;y=z.y+(q.y-z.y)*k;}
+      circle(p.color,x,y,p.special,flashingColor(p,now));
+    }
+  }else if(animation?.type==='fall'){
+    const t=Math.min(1,(now-animation.start)/FALL_MS),k=ease(t);
+    for(const p of pieces){const x=center(p.row,p.col).x,y=TOP+(p.fromRow+(p.row-p.fromRow)*k)*TILE+TILE/2;circle(p.color,x,y,p.special,flashingColor(p,now));}
+  }else for(const p of pieces){const q=center(p.row,p.col);circle(p.color,q.x,q.y,p.special,flashingColor(p,now));}
+  score.textContent=`3:${triples}  4:${quads}  5:${quints}`;
+  requestAnimationFrame(draw);
+}
+function findMatchData(){
+  const cells=new Set(),runs=[];
+  for(let r=0;r<ROWS;r++){let s=0;for(let c=1;c<=COLS;c++){if(c<COLS&&grid[r][c]!==null&&grid[r][c]===grid[r][c-1])continue;const len=c-s;if(grid[r][s]!==null&&len>=3){const runCells=[];for(let x=s;x<c;x++){cells.add(r+','+x);runCells.push([r,x]);}runs.push({len,orientation:'h',cells:runCells});}s=c;}}
+  for(let c=0;c<COLS;c++){let s=0;for(let r=1;r<=ROWS;r++){if(r<ROWS&&grid[r][c]!==null&&grid[r][c]===grid[r-1][c])continue;const len=r-s;if(grid[s][c]!==null&&len>=3){const runCells=[];for(let y=s;y<r;y++){cells.add(y+','+c);runCells.push([y,c]);}runs.push({len,orientation:'v',cells:runCells});}s=r;}}
+  return{cells:[...cells].map(x=>x.split(',').map(Number)),runs};
+}
+function findMatches(){return findMatchData().cells;}
+function countRuns(runs){for(const run of runs){const len=run.len;if(len===3)triples++;else if(len===4)quads++;else if(len>=5)quints++;}}
+function pieceAt(r,c){return pieces.find(p=>p.row===r&&p.col===c);}
+function snapshotMatchedSpecials(dead){
+  // Uložíme přímo typ a souřadnice bonusu. Aktivace pak není závislá na tom,
+  // zda se objekt kolečka během vyhodnocování změní nebo zda vznikne nový bonus.
+  const result=[];
+  for(const key of dead){
+    const [r,c]=key.split(',').map(Number),p=pieceAt(r,c);
+    if(p?.special)result.push({key,r,c,special:p.special,color:p.color});
+  }
+  return result;
+}
+function expandSpecialEffects(dead,bombTargets=new Map(),initialSpecials=null){
+  const queue=[...(initialSpecials||snapshotMatchedSpecials(dead))];
+  const queued=new Set(queue.map(item=>item.key)),processed=new Set();
+
+  const enqueueCell=(r,c)=>{
+    if(r<0||r>=ROWS||c<0||c>=COLS)return;
+    const key=r+','+c;
+    dead.add(key);
+    const p=pieceAt(r,c);
+    if(p?.special&&!queued.has(key)&&!processed.has(key)){
+      queue.push({key,r,c,special:p.special,color:p.color});
+      queued.add(key);
+    }
+  };
+
+  while(queue.length){
+    const effect=queue.shift();
+    if(processed.has(effect.key))continue;
+    processed.add(effect.key);
+    const {r,c,special,color,key}=effect;
+
+    // Pruhované kolečko se aktivuje vždy, jakmile je označeno ke zmizení.
+    if(special==='row'){
+      for(let x=0;x<COLS;x++)enqueueCell(r,x);
+    }else if(special==='col'){
+      for(let y=0;y<ROWS;y++)enqueueCell(y,c);
+    }else if(special==='area'){
+      for(let y=r-1;y<=r+1;y++)for(let x=c-1;x<=c+1;x++)enqueueCell(y,x);
+    }else if(special==='bomb'){
+      const target=bombTargets.has(key)?bombTargets.get(key):color;
+      if(target===null){
+        for(const p of pieces)enqueueCell(p.row,p.col);
+      }else{
+        for(const p of pieces)if(p.color===target)enqueueCell(p.row,p.col);
+      }
+    }
+  }
+}
+function createSpecials(runs,dead,preferred){
+  if(!SPECIALS_ENABLED)return;
+  const protectedCells=new Set(),handledRuns=new Set();
+
+  // Nejdřív vždy vyhodnotíme čtveřici vytvořenou právě provedeným tahem.
+  // Bonus musí vzniknout přesně na jednom z obou polí výměny, které čtveřici skutečně vytvořilo, a orientaci
+  // proužků určuje výhradně směr tahu, nikoliv orientace výsledné čtveřice.
+  if(preferred?.positions?.length){
+    // Po výměně se mohou shody vytvořit na obou jejích koncích. Speciální kolečko
+    // patří na tu z obou skutečně přesunutých pozic, která je součástí čtveřice/pětice.
+    // Cílová pozice taženého kolečka má prioritu, druhý konec je bezpečná varianta
+    // pro situaci, kdy čtveřici dokončilo kolečko odsunuté na původní místo.
+    for(const position of preferred.positions){
+      const positionRuns=runs.filter(run=>run.len>=4&&!handledRuns.has(run)&&run.cells.some(([r,c])=>r===position.r&&c===position.c));
+      if(!positionRuns.length)continue;
+      const p=pieceAt(position.r,position.c),key=position.r+','+position.c;
+      if(!p)continue;
+      const longest=Math.max(...positionRuns.map(run=>run.len));
+      p.special=longest>=5?'bomb':preferred.clearDirection;
+      dead.delete(key);protectedCells.add(key);
+      for(const run of positionRuns)handledRuns.add(run);
+    }
+  }
+
+  const horizontal=runs.filter(run=>run.orientation==='h'&&!handledRuns.has(run));
+  const vertical=runs.filter(run=>run.orientation==='v'&&!handledRuns.has(run));
+
+  // T nebo L vzniklé mimo právě přesunuté kolečko vytvoří prostorovou bombu 3x3.
+  for(const h of horizontal.filter(run=>run.len<5)){
+    for(const v of vertical.filter(run=>run.len<5)){
+      const crossing=h.cells.find(([r,c])=>v.cells.some(([vr,vc])=>vr===r&&vc===c));
+      if(!crossing)continue;
+      const [r,c]=crossing,p=pieceAt(r,c),key=r+','+c;
+      if(!p||p.special||protectedCells.has(key))continue;
+      p.special='area';dead.delete(key);protectedCells.add(key);
+      handledRuns.add(h);handledRuns.add(v);
+    }
+  }
+
+  // Bonusy vzniklé samovolným pádem nemají směr hráčova tahu; použije se
+  // standardní pravidlo podle orientace řady a bonus vznikne uprostřed řady.
+  for(const run of [...runs].filter(x=>x.len>=4&&!handledRuns.has(x)).sort((a,b)=>b.len-a.len)){
+    const centerCell=run.cells[Math.floor(run.cells.length/2)];
+    const choices=[centerCell,...run.cells];
+    const anchor=choices.find(([r,c])=>{const p=pieceAt(r,c),k=r+','+c;return p&&!p.special&&!protectedCells.has(k);});
+    if(!anchor)continue;
+    const [r,c]=anchor,p=pieceAt(r,c),key=r+','+c;
+    p.special=run.len>=5?'bomb':(run.orientation==='h'?'col':'row');
+    dead.delete(key);protectedCells.add(key);handledRuns.add(run);
+  }
+}
+function updateMoveStats(total){
+  lastMoveScore=total;
+  moveHistory.unshift(total);
+  moveHistory=moveHistory.slice(0,4);
+  maxMoveScore=Math.max(maxMoveScore,total);
+  updateMoveTexts();
+}
+function wait(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+async function animateSwap(r1,c1,r2,c2){
+  const a=pieces.find(p=>p.row===r1&&p.col===c1),b=pieces.find(p=>p.row===r2&&p.col===c2);
+  animation={type:'swap',start:performance.now(),a,b,fromA:{r:r1,c:c1},toA:{r:r2,c:c2},fromB:{r:r2,c:c2},toB:{r:r1,c:c1}};
+  await wait(SWAP_MS);[a.row,b.row]=[b.row,a.row];[a.col,b.col]=[b.col,a.col];animation=null;
+}
+function swapGrid(r1,c1,r2,c2){[grid[r1][c1],grid[r2][c2]]=[grid[r2][c2],grid[r1][c1]];}
+async function collapseAnimated(){
+  const next=Array.from({length:ROWS},()=>Array(COLS)),nextPieces=[];
+  for(let c=0;c<COLS;c++){
+    const survivors=pieces.filter(p=>p.col===c).sort((a,b)=>b.row-a.row);let target=ROWS-1;
+    for(const p of survivors){p.fromRow=p.row;p.row=target;p.col=c;next[target][c]=p.color;nextPieces.push(p);target--;}
+    for(let r=target;r>=0;r--){const color=randomColor(),spawn=r-target-1,p=colorPiece(color,r,c,spawn);next[r][c]=color;nextPieces.push(p);}
+  }
+  grid=next;pieces=nextPieces;animation={type:'fall',start:performance.now()};await wait(FALL_MS);animation=null;for(const p of pieces)p.fromRow=p.row;
+}
+async function resolve(options={}){
+  let removedThisMove=0,first=true;
+  while(true){
+    const data=findMatchData();
+    const forced=first&&options.forcedCells?options.forcedCells:null;
+    if(!data.cells.length&&!forced)break;
+    if(data.cells.length)countRuns(data.runs);
+    const dead=new Set(forced||data.cells.map(([r,c])=>r+','+c));
+
+    // Zachytíme existující speciální kolečka ještě před vytvořením případného nového bonusu.
+    // Právě tato kopie zaručí aktivaci pruhovaného kolečka v obyčejné trojici.
+    const existingSpecials=snapshotMatchedSpecials(dead);
+    if(data.cells.length)createSpecials(data.runs,dead,first?options.preferred:null);
+    expandSpecialEffects(dead,first&&options.bombTargets?options.bombTargets:new Map(),existingSpecials);
+    removedThisMove+=dead.size;
+    if(DISAPPEAR_DELAY_MS>0){
+      removalFlash={cells:new Set(dead),start:performance.now()};
+      await wait(DISAPPEAR_DELAY_MS);
+      removalFlash=null;
+    }
+    pieces=pieces.filter(p=>!dead.has(p.row+','+p.col));
+    for(const key of dead){const[r,c]=key.split(',').map(Number);grid[r][c]=null;}
+    await collapseAnimated();first=false;
+  }
+  return removedThisMove;
+}
+function validMoves(){
+  const moves=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)for(const [dr,dc] of [[0,1],[1,0]]){
+    const r2=r+dr,c2=c+dc;if(r2>=ROWS||c2>=COLS)continue;
+    swapGrid(r,c,r2,c2);const data=findMatchData();swapGrid(r,c,r2,c2);
+    const a=pieceAt(r,c),b=pieceAt(r2,c2),specialScore=(a?.special?30:0)+(b?.special?30:0);
+    if(data.cells.length||specialScore)moves.push({r,c,r2,c2,score:data.cells.length+specialScore+Math.random()*.2});
+  }
+  return moves.sort((a,b)=>b.score-a.score);
+}
+async function performMove(r,c,r2,c2){
+  if(busy)return false;busy=true;
+  await animateSwap(r,c,r2,c2);swapGrid(r,c,r2,c2);
+  const movedA=pieceAt(r2,c2),movedB=pieceAt(r,c),specialA=movedA?.special,specialB=movedB?.special;
+  if(SPECIALS_ENABLED&&(specialA||specialB)){
+    const forcedCells=new Set([r+','+c,r2+','+c2]),bombTargets=new Map();
+    if(specialA==='bomb'&&!specialB)bombTargets.set(r2+','+c2,movedB.color);
+    if(specialB==='bomb'&&!specialA)bombTargets.set(r+','+c,movedA.color);
+    const removed=await resolve({forcedCells,bombTargets});updateMoveStats(removed);
+  }else if(findMatches().length){const removed=await resolve({preferred:{positions:[{r:r2,c:c2},{r,c}],clearDirection:r2===r?'row':'col'}});updateMoveStats(removed);}
+  else{await animateSwap(r2,c2,r,c);swapGrid(r2,c2,r,c);busy=false;return false;}
+  busy=false;return true;
+}
+function scheduleAI(){clearTimeout(aiTimer);if(!AI_ENABLED)return;aiTimer=setTimeout(async()=>{if(!AI_ENABLED)return;if(busy){scheduleAI();return;}const moves=validMoves();if(!moves.length){init(false);scheduleAI();return;}const m=moves[0];await performMove(m.r,m.c,m.r2,m.c2);scheduleAI();},450);}
+async function deleteSelectedBall(r,c){
+  if(busy)return;busy=true;deleteMode=false;deleteButton.classList.remove('active');
+  const removed=await resolve({forcedCells:new Set([r+','+c])});updateMoveStats(removed);busy=false;
+}
+function pos(e){const t=e.touches?e.touches[0]:e;return{x:t.clientX,y:t.clientY};}
+function down(e){if(busy||(settingsPanel.classList.contains('open')&&!matchMedia('(min-width:769px) and (hover:hover)').matches))return;e.preventDefault();const p=pos(e),c=Math.floor((p.x-BOARD_LEFT)/TILE),r=Math.floor((p.y-TOP)/TILE);if(r>=0&&r<ROWS&&c>=0&&c<COLS){if(deleteMode){deleteSelectedBall(r,c);return;}start={x:p.x,y:p.y,r,c};}}
+async function up(e){
+  if(!start||busy)return;e.preventDefault();const t=e.changedTouches?e.changedTouches[0]:e,p={x:t.clientX,y:t.clientY};let r2=start.r,c2=start.c,dx=p.x-start.x,dy=p.y-start.y;
+  const threshold=Math.max(18,Math.min(35,TILE*.35));
+  if(Math.abs(dx)>Math.abs(dy)){if(dx>threshold)c2++;else if(dx<-threshold)c2--;}else{if(dy>threshold)r2++;else if(dy<-threshold)r2--;}
+  const s=start;start=null;if(r2<0||r2>=ROWS||c2<0||c2>=COLS||(r2===s.r&&c2===s.c))return;
+  busy=true;await animateSwap(s.r,s.c,r2,c2);swapGrid(s.r,s.c,r2,c2);
+  const movedA=pieceAt(r2,c2),movedB=pieceAt(s.r,s.c);
+  const specialA=movedA?.special,specialB=movedB?.special;
+  if(SPECIALS_ENABLED&&specialA&&specialB){
+    const forcedCells=new Set(),bombTargets=new Map(),add=(r,c)=>{if(r>=0&&r<ROWS&&c>=0&&c<COLS)forcedCells.add(r+','+c);};
+    const striped=x=>x==='row'||x==='col';
+
+    if(specialA==='bomb'&&specialB==='bomb'){
+      // Dvě barevné bomby odstraní celou plochu.
+      for(const p of pieces)add(p.row,p.col);
+      bombTargets.set(movedA.row+','+movedA.col,null);bombTargets.set(movedB.row+','+movedB.col,null);
+    }else if(specialA==='bomb'||specialB==='bomb'){
+      // Barevná bomba + funkční kolečko: všechna kolečka jeho barvy se změní na stejný typ a aktivují se.
+      const bomb=specialA==='bomb'?movedA:movedB,target=bomb===movedA?movedB:movedA,targetType=target.special;
+      bomb.special=null;add(bomb.row,bomb.col);
+      for(const p of pieces)if(p.color===target.color){p.special=targetType;add(p.row,p.col);}
+    }else if(striped(specialA)&&striped(specialB)){
+      // Dvě pruhovaná kolečka vyčistí řádek i sloupec v místě výměny.
+      movedA.special=null;movedB.special=null;
+      for(let x=0;x<COLS;x++)add(movedA.row,x);
+      for(let y=0;y<ROWS;y++)add(y,movedA.col);
+      add(movedB.row,movedB.col);
+    }else if((striped(specialA)&&specialB==='area')||(striped(specialB)&&specialA==='area')){
+      // Pruhované + prostorová bomba: tři sousední řádky a tři sousední sloupce.
+      movedA.special=null;movedB.special=null;
+      for(let d=-1;d<=1;d++){
+        for(let x=0;x<COLS;x++)add(movedA.row+d,x);
+        for(let y=0;y<ROWS;y++)add(y,movedA.col+d);
+      }
+      add(movedB.row,movedB.col);
+    }else if(specialA==='area'&&specialB==='area'){
+      // Dvě prostorové bomby vytvoří velký výbuch 5 x 5.
+      movedA.special=null;movedB.special=null;
+      for(let y=movedA.row-2;y<=movedA.row+2;y++)for(let x=movedA.col-2;x<=movedA.col+2;x++)add(y,x);
+      add(movedB.row,movedB.col);
+    }
+    const removed=await resolve({forcedCells,bombTargets});updateMoveStats(removed);
+  }else if(SPECIALS_ENABLED&&(specialA==='bomb'||specialB==='bomb')){
+    // Barevná bomba + obyčejné kolečko odstraní všechna kolečka jeho barvy.
+    const forcedCells=new Set(),bombTargets=new Map();
+    const bomb=specialA==='bomb'?movedA:movedB,target=bomb===movedA?movedB:movedA;
+    forcedCells.add(bomb.row+','+bomb.col);for(const p of pieces)if(p.color===target.color)forcedCells.add(p.row+','+p.col);
+    bombTargets.set(bomb.row+','+bomb.col,target.color);
+    const removed=await resolve({forcedCells,bombTargets});updateMoveStats(removed);
+  }else if(findMatches().length){const removed=await resolve({preferred:{positions:[{r:r2,c:c2},{r:s.r,c:s.c}],clearDirection:r2===s.r?'row':'col'}});updateMoveStats(removed);}
+  else{await animateSwap(r2,c2,s.r,s.c);swapGrid(r2,c2,s.r,s.c);}busy=false;
+}
+function updateEffectSettings(){
+  DISAPPEAR_DELAY_MS=Math.round(Number(disappearDelay.value)*1000);
+  BLINK_ENABLED=blinkEnabled.checked;
+  BLINK_COLOR=blinkColor.value.toUpperCase();
+  BLINK_FREQUENCY=Number(blinkFrequency.value);
+  disappearDelayValue.value=Number(disappearDelay.value).toLocaleString(LANGUAGE==='cs'?'cs-CZ':'en-US',{minimumFractionDigits:1,maximumFractionDigits:1})+' s';
+  blinkFrequencyValue.value=BLINK_FREQUENCY.toLocaleString(LANGUAGE==='cs'?'cs-CZ':'en-US',{minimumFractionDigits:BLINK_FREQUENCY%1?1:0,maximumFractionDigits:1})+' Hz';
+}
+function applySettings(){
+  COLOR_COUNT=Number(colorsRange.value);COLS=Number(colsRange.value);ROWS=Number(rowsRange.value);SPECIALS_ENABLED=specialsEnabled.checked;
+  colorsValue.value=COLOR_COUNT;colsValue.value=COLS;rowsValue.value=ROWS;
+  renderPaletteEditor();resize();init(true);
+}
+settingsButton.addEventListener('click',e=>{e.stopPropagation();const open=settingsPanel.classList.toggle('open');settingsButton.setAttribute('aria-expanded',String(open));});
+deleteButton.addEventListener('click',e=>{e.stopPropagation();deleteMode=!deleteMode;deleteButton.classList.toggle('active',deleteMode);});
+aiButton.addEventListener('click',e=>{e.stopPropagation();AI_ENABLED=!AI_ENABLED;aiButton.classList.toggle('active',AI_ENABLED);aiButton.setAttribute('aria-label',AI_ENABLED?tr('aiStop'):tr('aiStart'));aiButton.title=AI_ENABLED?tr('aiStop'):tr('aiStart');if(AI_ENABLED){deleteMode=false;deleteButton.classList.remove('active');scheduleAI();}else clearTimeout(aiTimer);});
+settingsPanel.addEventListener('pointerdown',e=>e.stopPropagation());
+for(const input of [colorsRange,colsRange,rowsRange])input.addEventListener('input',applySettings);
+boardWidthRange.addEventListener('input',()=>{BOARD_WIDTH=Number(boardWidthRange.value);boardWidthValue.value=BOARD_WIDTH+' %';localStorage.setItem('match3-board-width',String(BOARD_WIDTH));resize();});
+languageSelect.addEventListener('change',()=>{LANGUAGE=languageSelect.value;localStorage.setItem('match3-language',LANGUAGE);applyLanguage();updateEffectSettings();});
+specialsEnabled.addEventListener('change',applySettings);
+balls3dEnabled.addEventListener('change',()=>{BALLS_3D=balls3dEnabled.checked;localStorage.setItem('match3-balls-3d',String(BALLS_3D));});
+colorSchemeSelect.addEventListener('change',()=>{
+  ACTIVE_SCHEME=colorSchemeSelect.value;
+  ALL_COLORS=[...COLOR_SCHEMES[ACTIVE_SCHEME].colors];
+  localStorage.setItem('match3-color-scheme',ACTIVE_SCHEME);
+  renderPaletteEditor();init(true);
+});
+backgroundColor.addEventListener('input',()=>{BACKGROUND_COLOR=backgroundColor.value;document.body.style.backgroundColor=BACKGROUND_COLOR;});
+for(const input of [disappearDelay,blinkFrequency,blinkColor])input.addEventListener('input',updateEffectSettings);
+blinkEnabled.addEventListener('change',updateEffectSettings);
+document.addEventListener('pointerdown',e=>{if(!matchMedia('(min-width:769px) and (hover:hover)').matches&&!document.getElementById('settingsWrap').contains(e.target)){settingsPanel.classList.remove('open');settingsButton.setAttribute('aria-expanded','false');}});
+canvas.addEventListener('mousedown',down);canvas.addEventListener('mouseup',up);
+canvas.addEventListener('touchstart',down,{passive:false});canvas.addEventListener('touchend',up,{passive:false});
+boardWidthRange.value=String(BOARD_WIDTH);boardWidthValue.value=BOARD_WIDTH+' %';balls3dEnabled.checked=BALLS_3D;applyLanguage();updateEffectSettings();renderPaletteEditor();init();draw();
+</script>
+</body>
+</html>

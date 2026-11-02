@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Hexabloku LN</title>
+<style>
+:root{--bg1:#f8fafc;--bg2:#dbeafe;--bg3:#ede9fe;--text:#1e293b;--muted:#64748b;--panel:#ffffffe8;--cell:#fff;--line:#cbd5e1;--shadow:#64748b44}
+.dark{--bg1:#0f172a;--bg2:#111827;--bg3:#1e1b4b;--text:#e5e7eb;--muted:#94a3b8;--panel:#1e293bee;--cell:#162033;--line:#475569;--shadow:#0009}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;overscroll-behavior:none}body{min-height:100vh;padding:16px 10px;background:linear-gradient(135deg,var(--bg1),var(--bg2),var(--bg3));font:15px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--text);touch-action:none;user-select:none;transition:.25s}.app{max-width:620px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:10px}h1{margin:0;font-size:clamp(25px,6vw,34px)}.sub,.help,.msg{color:var(--muted)}.actions{display:flex;gap:7px}.icon{border:1px solid var(--line);background:var(--panel);color:inherit;border-radius:13px;padding:10px;font-size:18px;cursor:pointer}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}.stat{background:var(--panel);border-radius:17px;text-align:center;padding:9px}.lab{font-size:11px;font-weight:800;color:var(--muted)}.val{font-size:24px;font-weight:900}.box{position:relative;background:var(--panel);border-radius:26px;padding:8px;box-shadow:0 18px 40px var(--shadow)}#board{display:block;width:100%;height:auto;aspect-ratio:1.08;touch-action:none}.msg{text-align:center;min-height:24px;margin:13px 0 8px;font-weight:700}.pieces{display:flex;gap:9px}.piece{height:104px;flex:1;min-width:0;border:1px solid var(--line);border-radius:18px;background:var(--panel);display:grid;place-items:center;padding:5px;touch-action:none;cursor:grab}.piece:active{cursor:grabbing}.piece.hide{opacity:.14}.piece.empty{opacity:.15}.piece canvas{display:block;max-width:100%;max-height:92px;pointer-events:none}.help{text-align:center;font-size:12px;margin-top:16px}.overlay{display:none;position:absolute;inset:0;background:#020617bd;border-radius:26px;place-items:center;padding:25px;z-index:20}.overlay.show{display:grid}.modal{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:25px;text-align:center;width:100%;box-shadow:0 20px 50px #0008}.modal h2{margin:0 0 8px}.modal p{color:var(--muted)}.modal-actions{display:flex;justify-content:center;gap:10px;margin-top:18px;flex-wrap:wrap}.primary,.secondary,.danger{border:0;border-radius:15px;padding:12px 18px;font:inherit;font-weight:800;cursor:pointer}.primary{background:linear-gradient(90deg,#0ea5e9,#7c3aed);color:#fff}.secondary{background:var(--cell);color:var(--text);border:1px solid var(--line)}.danger{background:#ef4444;color:#fff}.ghost{position:fixed;z-index:50;pointer-events:none;opacity:.66;filter:drop-shadow(0 10px 12px #0007)}@media(max-width:460px){body{padding:9px 5px}.sub{display:none}.piece{height:88px}.icon{padding:9px}.actions{gap:4px}.box{padding:3px}}
+</style>
+</head>
+<body>
+<main class="app">
+<header class="top"><div><h1>Lukášův Hexabloku</h1><div class="sub">Klidná logická hra bez časového limitu</div></div><div class="actions"><button class="icon" id="colors" title="Přepnout barevné/modré dílky">🎨</button><button class="icon" id="theme" title="Tmavý režim">🌙</button><button class="icon" id="reset" title="Nová hra">↻</button></div></header>
+<section class="stats"><div class="stat"><div class="lab">SKÓRE</div><div class="val" id="score">0</div></div><div class="stat"><div class="lab">REKORD</div><div class="val" id="best">0</div></div><div class="stat"><div class="lab">KOMBO</div><div class="val" id="combo">×0</div></div></section>
+<div class="box"><canvas id="board" aria-label="Šestiúhelníková herní deska"></canvas>
+<div class="overlay" id="over"><div class="modal"><h2>Konec hry</h2><p>Získal jsi <b id="final"></b>.</p><button class="primary" id="again">Hrát znovu</button></div></div>
+<div class="overlay" id="confirm"><div class="modal"><h2>Začít novou hru?</h2><p>Rozehraná hra a skóre se ztratí. Rekord zůstane uložený.</p><div class="modal-actions"><button class="secondary" id="cancelReset">Ne, pokračovat</button><button class="danger" id="confirmReset">Ano, začít znovu</button></div></div></div></div>
+<div class="msg" id="msg">Uchop dílek a přetáhni ho na šestiúhelníkovou desku</div>
+<section class="pieces" id="pieces"></section>
+<div class="help" id="modeHelp">Dokonči celou linii v kterémkoli ze tří směrů. Režim: barevné dílky.</div>
+</main><canvas id="ghost" class="ghost" hidden></canvas>
+<script>
+(()=>{'use strict';
+const R=4, BLUE='#0ea5e9', COLORS=[BLUE,'#8b5cf6','#f97316','#10b981','#eab308'];
+const SHAPES=[
+ [[0,0]],[[0,0],[1,0]],[[0,0],[0,1]],[[0,0],[1,-1]],
+ [[0,0],[1,0],[2,0]],[[0,0],[0,1],[0,2]],[[0,0],[1,-1],[2,-2]],
+ [[0,0],[1,0],[0,1]],[[0,0],[1,0],[1,-1]],[[0,0],[0,1],[-1,1]],
+ [[0,0],[1,0],[2,0],[3,0]],[[0,0],[0,1],[0,2],[0,3]],[[0,0],[1,-1],[2,-2],[3,-3]],
+ [[0,0],[1,0],[0,1],[1,1]],[[0,0],[1,0],[1,-1],[2,-1]],
+ [[0,0],[1,0],[2,0],[1,1]],[[0,0],[0,1],[0,2],[1,0]],
+ [[0,0],[1,0],[2,0],[3,0],[4,0]],[[0,0],[0,1],[0,2],[0,3],[0,4]],[[0,0],[1,-1],[2,-2],[3,-3],[4,-4]]
+];
+const $=s=>document.querySelector(s), board=$('#board'), ctx=board.getContext('2d'), ghost=$('#ghost'), gctx=ghost.getContext('2d');
+const cells=[];for(let q=-R;q<=R;q++)for(let r=-R;r<=R;r++)if(Math.max(Math.abs(q),Math.abs(r),Math.abs(-q-r))<=R)cells.push({q,r});
+const key=(q,r)=>q+','+r, rnd=a=>a[Math.floor(Math.random()*a.length)];
+let occupied=new Map(), pieces=[], drag=null, score=0, combo=0, best=+(localStorage.getItem('hex-best')||0), mono=localStorage.getItem('hex-mono')==='1', geom=null;
+function newPiece(){return{cells:rnd(SHAPES).map(x=>[...x]),color:rnd(COLORS)}}function newSet(){return[newPiece(),newPiece(),newPiece()]}
+function pixel(q,r,size,cx,cy){return{x:cx+size*Math.sqrt(3)*(q+r/2),y:cy+size*1.5*r}}
+function hexPath(c,x,y,s){c.beginPath();for(let i=0;i<6;i++){let a=Math.PI/180*(60*i-30),px=x+s*Math.cos(a),py=y+s*Math.sin(a);i?c.lineTo(px,py):c.moveTo(px,py)}c.closePath()}
+function resize(){const dpr=Math.min(devicePixelRatio||1,2),rect=board.getBoundingClientRect();board.width=Math.round(rect.width*dpr);board.height=Math.round(rect.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);let size=Math.min(rect.width/(Math.sqrt(3)*(2*R+1.15)),rect.height/(3*R+2.15));geom={size,cx:rect.width/2,cy:rect.height/2,w:rect.width,h:rect.height};drawBoard()}
+function colorOf(p){return mono?BLUE:p.color}
+function canPlace(p,aq,ar){return p.cells.every(([q,r])=>cells.some(c=>c.q===aq+q&&c.r===ar+r)&&!occupied.has(key(aq+q,ar+r)))}
+function fits(p){return cells.some(c=>canPlace(p,c.q,c.r))}
+function nearest(clientX,clientY){let rect=board.getBoundingClientRect(),x=clientX-rect.left,y=clientY-rect.top-(matchMedia('(pointer:coarse)').matches?62:0),bestCell=null,dist=Infinity;for(const c of cells){let p=pixel(c.q,c.r,geom.size,geom.cx,geom.cy),d=(p.x-x)**2+(p.y-y)**2;if(d<dist){dist=d;bestCell=c}}return dist<geom.size*geom.size*1.4?bestCell:null}
+function drawBoard(){if(!geom)return;ctx.clearRect(0,0,geom.w,geom.h);let target=drag?nearest(drag.x,drag.y):null, preview=new Map();if(target)for(const [q,r] of drag.p.cells)preview.set(key(target.q+q,target.r+r),canPlace(drag.p,target.q,target.r));for(const c of cells){let p=pixel(c.q,c.r,geom.size,geom.cx,geom.cy),v=occupied.get(key(c.q,c.r)),pv=preview.get(key(c.q,c.r));hexPath(ctx,p.x,p.y,geom.size*.92);ctx.fillStyle=v?(mono?BLUE:v):(pv===true?colorOf(drag.p):pv===false?'#ef4444':getComputedStyle(document.documentElement).getPropertyValue('--cell'));ctx.globalAlpha=pv!==undefined?.38:1;ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--line');ctx.lineWidth=1.2;ctx.stroke()}}
+function drawPieceCanvas(canvas,p,sizeHint=17){let c=canvas.getContext('2d'),pts=p.cells.map(([q,r])=>pixel(q,r,sizeHint,0,0)),minX=Math.min(...pts.map(x=>x.x))-sizeHint,maxX=Math.max(...pts.map(x=>x.x))+sizeHint,minY=Math.min(...pts.map(x=>x.y))-sizeHint,maxY=Math.max(...pts.map(x=>x.y))+sizeHint,dpr=Math.min(devicePixelRatio||1,2),w=maxX-minX,h=maxY-minY;canvas.width=Math.ceil(w*dpr);canvas.height=Math.ceil(h*dpr);canvas.style.width=w+'px';canvas.style.height=h+'px';c.setTransform(dpr,0,0,dpr,-minX*dpr,-minY*dpr);for(const pt of pts){hexPath(c,pt.x,pt.y,sizeHint*.9);c.fillStyle=colorOf(p);c.fill()}}
+function renderPieces(){$('#pieces').innerHTML=pieces.map((p,i)=>p?`<button class="piece ${drag?.i===i?'hide':''}" data-i="${i}" aria-label="Dílek ${i+1}"><canvas></canvas></button>`:'<div class="piece empty"></div>').join('');document.querySelectorAll('[data-i]').forEach(el=>{drawPieceCanvas(el.querySelector('canvas'),pieces[+el.dataset.i]);el.onpointerdown=startDrag})}
+function startDrag(e){if($('#confirm').classList.contains('show'))return;e.preventDefault();let i=+e.currentTarget.dataset.i;drag={i,p:pieces[i],x:e.clientX,y:e.clientY};drawPieceCanvas(ghost,drag.p,23);ghost.hidden=false;moveDrag(e);renderPieces()}
+function moveDrag(e){if(!drag)return;e.preventDefault();drag.x=e.clientX;drag.y=e.clientY;ghost.style.left=e.clientX+'px';ghost.style.top=(e.clientY-(matchMedia('(pointer:coarse)').matches?62:0))+'px';ghost.style.transform='translate(-50%,-50%)';drawBoard()}
+function completedLines(){let remove=new Set(),lines=0;for(const axis of ['q','r','s'])for(let v=-R;v<=R;v++){let line=cells.filter(c=>(axis==='q'?c.q:axis==='r'?c.r:-c.q-c.r)===v);if(line.length>=5&&line.every(c=>occupied.has(key(c.q,c.r)))){lines++;line.forEach(c=>remove.add(key(c.q,c.r)))}}remove.forEach(k=>occupied.delete(k));return{count:remove.size,lines}}
+function endDrag(e){if(!drag)return;let d=drag,t=nearest(e.clientX,e.clientY),ok=t&&canPlace(d.p,t.q,t.r);drag=null;ghost.hidden=true;if(ok){for(const [q,r] of d.p.cells)occupied.set(key(t.q+q,t.r+r),d.p.color);let cleared=completedLines();combo=cleared.lines?combo+1:0;let add=d.p.cells.length+cleared.count*2+cleared.lines*12+(cleared.lines?combo*5:0);score+=add;pieces[d.i]=null;if(pieces.every(x=>x===null))pieces=newSet();$('#msg').textContent=cleared.count?`Vyčištěno ${cleared.lines} ${cleared.lines===1?'linie':'linií'}! +${add}`:`Dílek položen · +${add}`;updateStats()}else $('#msg').textContent='Sem dílek nelze položit';drawBoard();renderPieces();let available=pieces.filter(Boolean);if(available.length&&!available.some(fits)){setTimeout(()=>{$('#final').textContent=score+' bodů';$('#over').classList.add('show')},180)}}
+function updateStats(){if(score>best){best=score;localStorage.setItem('hex-best',String(best))}$('#score').textContent=score;$('#best').textContent=best;$('#combo').textContent='×'+combo}
+function resetGame(){occupied.clear();pieces=newSet();drag=null;ghost.hidden=true;score=combo=0;$('#over').classList.remove('show');$('#confirm').classList.remove('show');$('#msg').textContent='Uchop dílek a přetáhni ho na šestiúhelníkovou desku';updateStats();drawBoard();renderPieces()}
+function setTheme(dark){document.documentElement.classList.toggle('dark',dark);$('#theme').textContent=dark?'☀️':'🌙';localStorage.setItem('hex-dark',dark?'1':'0');drawBoard()}
+function setColorMode(value){mono=value;localStorage.setItem('hex-mono',mono?'1':'0');$('#colors').textContent=mono?'🔵':'🎨';$('#modeHelp').textContent=`Dokonči celou linii v kterémkoli ze tří směrů. Režim: ${mono?'pouze modré':'barevné'} dílky.`;drawBoard();renderPieces()}
+addEventListener('pointermove',moveDrag,{passive:false});addEventListener('pointerup',endDrag);addEventListener('pointercancel',endDrag);addEventListener('resize',resize);$('#reset').onclick=()=>$('#confirm').classList.add('show');$('#cancelReset').onclick=()=>$('#confirm').classList.remove('show');$('#confirmReset').onclick=resetGame;$('#again').onclick=resetGame;$('#theme').onclick=()=>setTheme(!document.documentElement.classList.contains('dark'));$('#colors').onclick=()=>setColorMode(!mono);setTheme(localStorage.getItem('hex-dark')==='1'||(!localStorage.getItem('hex-dark')&&matchMedia('(prefers-color-scheme:dark)').matches));resetGame();setColorMode(mono);requestAnimationFrame(resize);
+})();
+</script></body></html>

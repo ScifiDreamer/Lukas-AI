@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lukášův Rolit</title>
+
+<style>
+body{
+    font-family:Arial,sans-serif;
+    text-align:center;
+    background:#1f2937;
+    color:white;
+}
+
+.controls{
+    margin:15px;
+}
+
+#board{
+    display:grid;
+    gap:4px;
+    justify-content:center;
+    margin:20px auto;
+}
+
+.cell{
+    width:50px;
+    height:50px;
+    background:#15803d;
+    border-radius:6px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    cursor:pointer;
+    position:relative;
+}
+
+.validMove::after{
+    content:"";
+    width:14px;
+    height:14px;
+    border-radius:50%;
+    background:white;
+    opacity:0.8;
+}
+
+.piece{
+    width:38px;
+    height:38px;
+    border-radius:50%;
+}
+
+.red{background:red;}
+.blue{background:dodgerblue;}
+.yellow{background:gold;}
+.green{background:limegreen;}
+
+#message{
+    margin-top:20px;
+    font-size:28px;
+    font-weight:bold;
+}
+</style>
+</head>
+<body>
+
+<h1>Lukášův Rolit</h1>
+
+<div class="controls">
+
+Počet hráčů:
+
+<select id="playerCount">
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4" selected>4</option>
+</select>
+
+Velikost desky:
+
+<select id="boardSize">
+    <option value="6">6×6</option>
+    <option value="8" selected>8×8</option>
+    <option value="10">10×10</option>
+    <option value="12">12×12</option>
+</select>
+
+<button onclick="startGame()">Nová hra</button>
+
+</div>
+
+<h2 id="turn"></h2>
+
+<div id="board"></div>
+
+<p id="score"></p>
+
+<div id="message"></div>
+
+<script>
+
+let size=8;
+
+const allColors=[
+"red",
+"blue",
+"yellow",
+"green"
+];
+
+let colors=[];
+let player=0;
+let board=[];
+
+const dirs=[
+[-1,-1],[-1,0],[-1,1],
+[0,-1],        [0,1],
+[1,-1],[1,0],[1,1]
+];
+
+function startGame(){
+
+    size=parseInt(
+        document.getElementById("boardSize").value
+    );
+
+    let count=parseInt(
+        document.getElementById("playerCount").value
+    );
+
+    colors=allColors.slice(0,count);
+
+    player=0;
+
+    board=Array(size)
+        .fill()
+        .map(()=>Array(size).fill(null));
+
+    const c=Math.floor(size/2)-1;
+
+    if(count===2){
+
+        board[c][c]="red";
+        board[c][c+1]="blue";
+        board[c+1][c]="blue";
+        board[c+1][c+1]="red";
+    }
+
+    if(count===3){
+
+        board[c][c]="red";
+        board[c][c+1]="blue";
+        board[c+1][c]="yellow";
+    }
+
+    if(count===4){
+
+        board[c][c]="red";
+        board[c][c+1]="blue";
+        board[c+1][c]="yellow";
+        board[c+1][c+1]="green";
+    }
+
+    document.getElementById("board").style.gridTemplateColumns=
+        `repeat(${size},50px)`;
+
+    document.getElementById("message").textContent="";
+
+    draw();
+}
+
+function setCursor(){
+
+    let color=colors[player];
+
+    document.body.style.cursor=
+    `url("data:image/svg+xml;utf8,
+    <svg xmlns='http://www.w3.org/2000/svg' width='36' height='36'>
+    <circle cx='18' cy='18' r='12'
+    fill='${color}'
+    stroke='black'
+    stroke-width='2'/>
+    </svg>") 18 18, auto`;
+}
+
+function hasNeighbor(r,c){
+
+    for(const [dr,dc] of dirs){
+
+        const rr=r+dr;
+        const cc=c+dc;
+
+        if(
+            rr>=0 &&
+            rr<size &&
+            cc>=0 &&
+            cc<size &&
+            board[rr][cc]
+        ){
+            return true;
+        }
+    }
+    return false;
+}
+
+function isValidMove(r,c){
+
+    if(board[r][c]) return false;
+
+    return hasNeighbor(r,c);
+}
+
+function draw(){
+
+    const boardEl=document.getElementById("board");
+
+    boardEl.innerHTML="";
+
+    for(let r=0;r<size;r++){
+
+        for(let c=0;c<size;c++){
+
+            const cell=document.createElement("div");
+            cell.className="cell";
+
+            if(isValidMove(r,c)){
+                cell.classList.add("validMove");
+            }
+
+            cell.onclick=()=>move(r,c);
+
+            if(board[r][c]){
+
+                const piece=document.createElement("div");
+
+                piece.className=
+                    "piece " + board[r][c];
+
+                cell.appendChild(piece);
+            }
+
+            boardEl.appendChild(cell);
+        }
+    }
+
+    document.getElementById("turn").textContent=
+        "Tah hráče: " + colors[player];
+
+    updateScore();
+    setCursor();
+}
+
+function move(r,c){
+
+    if(!isValidMove(r,c)) return;
+
+    const color=colors[player];
+
+    board[r][c]=color;
+
+    // V každém směru najdi nejvzdálenější tečku stejné barvy.
+    // Všechny již položené tečky mezi ní a novou tečkou přebarvi.
+    for(const [dr,dc] of dirs){
+
+        let rr=r+dr;
+        let cc=c+dc;
+        let farthestOwn=null;
+
+        while(
+            rr>=0 &&
+            rr<size &&
+            cc>=0 &&
+            cc<size
+        ){
+            if(board[rr][cc]===color){
+                farthestOwn=[rr,cc];
+            }
+
+            rr+=dr;
+            cc+=dc;
+        }
+
+        if(farthestOwn){
+            rr=r+dr;
+            cc=c+dc;
+
+            while(
+                rr!==farthestOwn[0] ||
+                cc!==farthestOwn[1]
+            ){
+                // Prázdná políčka zůstávají prázdná; mění se jen tečky.
+                if(board[rr][cc]){
+                    board[rr][cc]=color;
+                }
+
+                rr+=dr;
+                cc+=dc;
+            }
+        }
+    }
+
+    player=(player+1)%colors.length;
+
+    draw();
+
+    checkWinner();
+}
+
+function updateScore(){
+
+    let text="";
+
+    colors.forEach(color=>{
+
+        let count=
+        board.flat().filter(v=>v===color).length;
+
+        text+=`${color}: ${count} | `;
+    });
+
+    document.getElementById("score").textContent=text;
+}
+
+function checkWinner(){
+
+    let valid=false;
+
+    for(let r=0;r<size;r++){
+
+        for(let c=0;c<size;c++){
+
+            if(isValidMove(r,c)){
+                valid=true;
+            }
+        }
+    }
+
+    if(valid) return;
+
+    let winner="";
+    let best=-1;
+
+    colors.forEach(color=>{
+
+        const count=
+        board.flat().filter(v=>v===color).length;
+
+        if(count>best){
+
+            best=count;
+            winner=color;
+        }
+    });
+
+    document.getElementById("message").textContent=
+        "🏆 Vítěz je " +
+        winner +
+        " (" +
+        best +
+        " koleček)";
+
+    document.body.style.cursor="default";
+}
+
+startGame();
+
+</script>
+
+</body>
+</html>

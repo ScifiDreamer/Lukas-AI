@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Lukášův had - v35</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07110b;
+      --panel: #102017;
+      --board: #0b1710;
+      --grid: rgba(255,255,255,.055);
+      --snake: #39d353;
+      --head: #8cff9a;
+      --food: #ff4d4d;
+      --collision: #ffd43b;
+      --text: #f4fff6;
+      --muted: #a9c6ae;
+      --button: #1d3926;
+      --button-active: #2d6540;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg); color: var(--text); touch-action: none;
+      user-select: none; -webkit-user-select: none;
+    }
+    button, input, summary { font: inherit; }
+    #app { height: 100%; display: grid; grid-template-rows: auto 1fr auto; }
+    header {
+      min-height: 62px; padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      background: color-mix(in srgb, var(--bg) 96%, transparent); border-bottom: 1px solid #284332;
+    }
+    .score { font-size: clamp(17px, 3vw, 26px); font-weight: 800; white-space: nowrap; }
+    .best { color: var(--muted); font-size: clamp(14px, 2vw, 19px); white-space: nowrap; }
+    .speed-control { display:flex; align-items:center; gap:8px; color:var(--muted); font-weight:700; white-space:nowrap; }
+    #speedSlider { width: clamp(110px, 18vw, 210px); accent-color: var(--snake); cursor: pointer; }
+    #speedValue { min-width: 4.5em; color: var(--text); text-align: right; }
+    .top-button {
+      border-radius: 12px; padding: 9px 14px; font-size: 15px; font-weight: 750; cursor: pointer;
+      border: 1px solid #4f715a; color: #effff2; background: var(--button);
+    }
+    .top-button:hover:not(:disabled) { background: var(--button-active); }
+    .top-button:disabled { opacity: .45; cursor: default; }
+    #pauseBtn { margin-left: auto; }
+    #gameWrap { min-height: 0; position: relative; display: grid; place-items: center; padding: 8px; }
+    canvas { display:block; border:2px solid #31523b; border-radius:10px; background:var(--board); max-width:100%; max-height:100%; }
+    #overlay { position:absolute; inset:8px; display:none; place-items:center; background:rgba(2,8,4,.62); backdrop-filter:blur(2px); border-radius:10px; }
+    #overlay.show { display:grid; }
+    .dialog { width:min(90%,440px); text-align:center; padding:26px; border-radius:18px; background:#112219; border:1px solid #3a6046; box-shadow:0 18px 55px #0009; }
+    .dialog h1 { margin:0 0 8px; font-size:34px; }
+    .dialog p { color:var(--muted); margin:8px 0 20px; line-height:1.45; }
+    .dialog button { border:0; border-radius:13px; padding:13px 24px; background:#2c9d47; color:white; font-size:18px; font-weight:800; cursor:pointer; }
+    #settingsPanel {
+      position:fixed; z-index:20; top:72px; right:12px; width:min(420px,calc(100vw - 24px)); max-height:calc(100vh - 96px); overflow:auto;
+      display:none; padding:16px; border-radius:16px; background:#112219f7; border:1px solid #3a6046; box-shadow:0 18px 55px #000b;
+    }
+    #settingsPanel.show { display:block; }
+    #settingsPanel h2 { margin:0 0 12px; }
+    .setting { display:grid; grid-template-columns:1fr minmax(130px,1.3fr); align-items:center; gap:12px; margin:11px 0; }
+    .setting label { color:var(--muted); font-weight:700; }
+    .setting input[type="range"] { width:100%; accent-color:var(--snake); }
+    .value { color:var(--text); font-size:13px; text-align:right; }
+    .toggle { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
+    .toggle input { width:20px; height:20px; accent-color:var(--snake); }
+    .toggle-button { min-width:112px; }
+    .area-percent { color:var(--head); font-size:clamp(14px,2vw,19px); font-weight:800; white-space:nowrap; }
+    .colors { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:12px; }
+    .color-setting { display:flex; align-items:center; justify-content:space-between; gap:9px; color:var(--muted); font-weight:700; }
+    .color-setting input { width:46px; height:34px; padding:2px; border:1px solid #50725b; border-radius:8px; background:transparent; }
+    .settings-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:15px; }
+    #controls { padding:8px 12px max(10px,env(safe-area-inset-bottom)); background:var(--panel); border-top:1px solid #284332; display:grid; place-items:center; }
+    body.controls-hidden #controls { display:none; }
+    #helpBtn.active, #wideHeadBtn.active, #aiBtn.active, .toggle-button.active { background:var(--button-active); border-color:var(--head); box-shadow:0 0 0 2px color-mix(in srgb,var(--head) 35%,transparent); }
+    .schemes { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:10px 0 14px; }
+    #moreColorsPanel { display:none; }
+    #moreColorsPanel.show { display:block; }
+    #moreColorsBtn { background:var(--button); border-color:#4f715a; }
+    #moreColorsBtn:hover { background:var(--button-active); }
+    #moreColorsBtn.active { background:var(--button-active); border-color:var(--head); }
+    .scheme-btn { min-height:42px; border:1px solid #5b7863; border-radius:11px; color:white; font-weight:800; cursor:pointer; text-shadow:0 1px 2px #000; }
+    .dpad { display:grid; grid-template-columns:repeat(3,min(18vw,82px)); grid-template-rows:repeat(2,min(14vw,60px)); gap:7px; }
+    .control { border:1px solid #43654e; border-radius:14px; background:var(--button); color:white; font-size:clamp(24px,6vw,36px); font-weight:900; cursor:pointer; box-shadow:inset 0 -4px 0 #0a1810; -webkit-tap-highlight-color:transparent; }
+    .control:active,.control.active { background:var(--button-active); transform:translateY(1px); }
+    #up{grid-column:2;grid-row:1} #left{grid-column:1;grid-row:2} #down{grid-column:2;grid-row:2} #right{grid-column:3;grid-row:2}
+    @media (max-width:720px) {
+      header { gap:7px; padding-left:8px; padding-right:8px; }
+      .speed-control { order:6; width:100%; justify-content:center; }
+      #speedSlider { flex:1; max-width:310px; }
+      #pauseBtn { margin-left:auto; }
+      .top-button { padding:7px 10px; }
+      #settingsPanel { top:112px; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="score">Skóre: <span id="score">0</span></div>
+    <div class="best">Rekord: <span id="best">0</span></div>
+    <div class="area-percent"><span id="areaLabel">Plocha</span>: <span id="areaPercent">0.00 %</span></div>
+    <label class="speed-control" for="speedSlider">Rychlost
+      <input id="speedSlider" type="range" min="0" max="1000" value="0" step="1" aria-label="Rychlost 0,5 až 333 Hz, logaritmická stupnice">
+      <span id="speedValue">8.0 Hz</span>
+    </label>
+    <button id="pauseBtn" class="top-button" type="button" disabled>Pauza</button>
+    <button id="helpBtn" class="top-button" type="button" aria-pressed="false" title="Zvýraznit řádek nebo sloupec ve směru pohybu">Help</button>
+    <button id="wallCollisionTopBtn" class="top-button toggle-button" type="button" aria-pressed="false">Stěny: Vyp</button>
+    <button id="selfCollisionTopBtn" class="top-button toggle-button active" type="button" aria-pressed="true">Sebe: Zap</button>
+    <button id="aiBtn" class="top-button" type="button" aria-pressed="false" title="Automatické hraní">AI</button>
+    <button id="newGameBtn" class="top-button" type="button">Nová hra</button>
+    <button id="settingsBtn" class="top-button" type="button" aria-expanded="false">Nastavení</button>
+  </header>
+
+  <aside id="settingsPanel" aria-label="Nastavení hry">
+    <h2 id="settingsTitle">Lukášův had</h2>
+    <div class="setting"><label id="languageButtonLabel" for="englishBtn">Jazyk</label><button id="englishBtn" class="top-button" type="button">English</button></div>
+    <div class="setting">
+      <label for="wallCollision">Kolize se stěnami</label>
+      <button id="wallCollisionBtn" class="top-button toggle-button" type="button"><span id="wallCollisionValue">Vypnuto</span></button>
+    </div>
+    <div class="setting">
+      <label for="selfCollision">Kolize se sebou</label>
+      <button id="selfCollisionBtn" class="top-button toggle-button active" type="button"><span id="selfCollisionValue">Zapnuto</span></button>
+    </div>
+    <div class="setting">
+      <label for="boardSize">Velikost plochy</label>
+      <div><input id="boardSize" type="range" min="10" max="100" value="100" step="5"><div id="boardSizeValue" class="value">100 %</div></div>
+    </div>
+    <div class="setting">
+      <label for="initialLength">Počáteční dílky</label>
+      <div><input id="initialLength" type="range" min="0" max="1000" value="0" step="1" aria-label="Počáteční dílky 2 až 3333, logaritmická stupnice"><div id="initialLengthValue" class="value">3</div></div>
+    </div>
+    <div class="setting"><label id="headWidthLabel" for="wideHeadBtn">Šířka hlavy</label><button id="wideHeadBtn" class="top-button" type="button" aria-pressed="false">Hlava 1</button></div>
+    <div class="setting">
+      <label for="showControls">Ukázat šipky</label>
+      <button id="showControlsBtn" class="top-button toggle-button active" type="button"><span id="showControlsValue">Zapnuto</span></button>
+    </div>
+    <div class="setting">
+      <label for="gaplessSnake">Dílky hada bez mezer</label>
+      <button id="gaplessSnakeBtn" class="top-button toggle-button" type="button"><span id="gaplessSnakeValue">Vypnuto</span></button>
+    </div>
+    <div class="setting">
+      <label for="snake3dBtn">3D vzhled hada</label>
+      <button id="snake3dBtn" class="top-button toggle-button" type="button"><span id="snake3dValue">Vypnuto</span></button>
+    </div>
+    <div class="setting"><label>Verze</label><div class="value">35</div></div>
+    <label id="schemesLabel" style="display:block;color:var(--muted);font-weight:800;margin-top:12px">Barevná schémata</label>
+    <div class="schemes" id="mainSchemes">
+      <button class="scheme-btn" data-scheme="forest" style="background:linear-gradient(135deg,#07110b 50%,#39d353 50%)">Les</button>
+      <button class="scheme-btn" data-scheme="ocean" style="background:linear-gradient(135deg,#061726 50%,#36c5f0 50%)">Oceán</button>
+      <button id="moreColorsBtn" class="scheme-btn" type="button">Více</button>
+    </div>
+    <div id="moreColorsPanel">
+      <div class="schemes" id="extraSchemes">
+        <button class="scheme-btn" data-scheme="sunset" style="background:linear-gradient(135deg,#241025 50%,#ff8a3d 50%)">Západ</button>
+        <button class="scheme-btn" data-scheme="ice" style="background:linear-gradient(135deg,#e9f7ff 50%,#168aad 50%);color:#082638;text-shadow:none">Led</button>
+        <button class="scheme-btn" data-scheme="mono" style="background:linear-gradient(135deg,#111 50%,#eee 50%);color:#ffdf00">Mono</button>
+        <button class="scheme-btn" data-scheme="candy" style="background:linear-gradient(135deg,#251338 50%,#ff57b9 50%)">Candy</button>
+        <button class="scheme-btn" data-scheme="lava" style="background:linear-gradient(135deg,#210400 50%,#ff3d00 50%)">Láva</button>
+        <button class="scheme-btn" data-scheme="neon" style="background:linear-gradient(135deg,#070017 50%,#00ff9d 50%)">Neon</button>
+        <button class="scheme-btn" data-scheme="desert" style="background:linear-gradient(135deg,#3a2718 50%,#d9a441 50%)">Poušť</button>
+        <button class="scheme-btn" data-scheme="royal" style="background:linear-gradient(135deg,#130b2e 50%,#9d7cff 50%)">Royal</button>
+        <button class="scheme-btn" data-scheme="spring" style="background:linear-gradient(135deg,#eaf8df 50%,#63c174 50%);color:#173516;text-shadow:none">Jaro</button>
+        <button class="scheme-btn" data-scheme="retro" style="background:linear-gradient(135deg,#192a1f 50%,#c7f464 50%);color:#102010;text-shadow:none">Retro</button>
+        <button class="scheme-btn" data-scheme="arctic" style="background:linear-gradient(135deg,#071c2c 50%,#d9fbff 50%);color:#123;text-shadow:none">Arktida</button>
+        <button class="scheme-btn" data-scheme="autumn" style="background:linear-gradient(135deg,#2b1607 50%,#d97904 50%)">Podzim</button>
+        <button class="scheme-btn" data-scheme="matrix" style="background:linear-gradient(135deg,#020802 50%,#00ff41 50%)">Matrix</button>
+        <button class="scheme-btn" data-scheme="berry" style="background:linear-gradient(135deg,#26051f 50%,#d94f9d 50%)">Bobule</button>
+        <button class="scheme-btn" data-scheme="gold" style="background:linear-gradient(135deg,#211600 50%,#ffd700 50%);color:#261900;text-shadow:none">Zlato</button>
+        <button class="scheme-btn" data-scheme="pastel" style="background:linear-gradient(135deg,#edf7ed 50%,#a8dadc 50%);color:#234;text-shadow:none">Pastel</button>
+        <button id="randomColorsBtn" class="scheme-btn" type="button" style="background:linear-gradient(135deg,#ff1764,#ffca28,#00e5ff,#7c4dff)">Náhodné</button>
+      </div>
+      <label id="customColorsLabel" style="display:block;color:var(--muted);font-weight:800;margin:14px 0 4px">Vlastní barvy</label>
+      <div class="colors">
+        <label class="color-setting">Had <input id="snakeColor" type="color" value="#39d353"></label>
+        <label class="color-setting">Hlava <input id="headColor" type="color" value="#8cff9a"></label>
+        <label class="color-setting">Jídlo <input id="foodColor" type="color" value="#ff4d4d"></label>
+        <label class="color-setting">Kolize <input id="collisionColor" type="color" value="#ffd43b"></label>
+        <label class="color-setting">Nápověda <input id="helpColor" type="color" value="#8cff9a"></label>
+        <label class="color-setting">Plocha <input id="boardColor" type="color" value="#0b1710"></label>
+        <label class="color-setting">Pozadí <input id="bgColor" type="color" value="#07110b"></label>
+      </div>
+    </div>
+    <div class="settings-actions">
+      <button id="resetSettingsBtn" class="top-button" type="button">Výchozí</button>
+      <button id="closeSettingsBtn" class="top-button" type="button">Hotovo</button>
+    </div>
+  </aside>
+
+  <main id="gameWrap">
+    <canvas id="game" aria-label="Hra Had"></canvas>
+    <div id="overlay" class="show"><div class="dialog">
+      <h1 id="message">Lukášův had</h1>
+      <p id="detail">Ovládej šipkami, klávesami WASD nebo tlačítky. Mezerník vždy zapíná a vypíná pauzu. Help zvýrazní směr jízdy. AI spustí automatické hraní. Tlačítko Hlava postupně mění šířku na 1, 3 a 5 dílků.</p>
+      <button id="startBtn" type="button">Spustit hru</button>
+    </div></div>
+  </main>
+  <footer id="controls" aria-label="Dotykové ovládání"><div class="dpad">
+    <button class="control" id="up" data-dir="up" aria-label="Nahoru">↑</button>
+    <button class="control" id="left" data-dir="left" aria-label="Vlevo">←</button>
+    <button class="control" id="down" data-dir="down" aria-label="Dolů">↓</button>
+    <button class="control" id="right" data-dir="right" aria-label="Vpravo">→</button>
+  </div></footer>
+</div>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const canvas=$('game'), ctx=canvas.getContext('2d'), wrap=$('gameWrap');
+  const scoreEl=$('score'), bestEl=$('best'), areaPercentEl=$('areaPercent'), overlay=$('overlay'), message=$('message'), detail=$('detail');
+  const startBtn=$('startBtn'), pauseBtn=$('pauseBtn'), settingsPanel=$('settingsPanel'), settingsBtn=$('settingsBtn');
+  const speedSlider=$('speedSlider'), speedValue=$('speedValue');
+  const CELL=28;
+  const SLIDER_STEPS=1000, MIN_SPEED=.5, MAX_SPEED=333, MIN_LENGTH=2, MAX_LENGTH=3333;
+  const logToSlider=(value,min,max)=>Math.round(Math.log(Math.max(min,Math.min(max,value))/min)/Math.log(max/min)*SLIDER_STEPS);
+  const sliderToLog=(position,min,max)=>min*Math.pow(max/min,Number(position)/SLIDER_STEPS);
+  const defaults={language:'cs',speed:8,initialLength:3,boardSize:100,wallCollision:false,selfCollision:true,helpEnabled:false,headWidth:1,aiEnabled:false,gaplessSnake:false,snake3d:false,controlsHidden:false,snakeColor:'#39d353',headColor:'#8cff9a',foodColor:'#ff4d4d',collisionColor:'#ffd43b',helpColor:'#8cff9a',boardColor:'#0b1710',bgColor:'#07110b'};
+  let cfg={...defaults};
+  try { cfg={...cfg,...JSON.parse(localStorage.getItem('had-settings')||'{}')}; } catch (_) {}
+  if(![1,3,5].includes(Number(cfg.headWidth))) cfg.headWidth=cfg.wideHead?3:1; delete cfg.wideHead;
+  let stepsPerSecond=cfg.speed, stepMs=1000/stepsPerSecond, cols=20, rows=14;
+  let snake=[], food={x:0,y:0}, direction={x:1,y:0}, queuedDirection={x:1,y:0};
+  let score=0, best=Number(localStorage.getItem('had-best')||0), running=false, paused=false, gameActive=false, lastStep=0;
+  let collisionFlash=[];
+  const helpBtn=$('helpBtn'), wideHeadBtn=$('wideHeadBtn'), aiBtn=$('aiBtn'), newGameBtn=$('newGameBtn');
+  bestEl.textContent=best;
+
+  function saveSettings(){ localStorage.setItem('had-settings',JSON.stringify(cfg)); }
+  function setCssColors(){
+    const r=document.documentElement.style;
+    r.setProperty('--snake',cfg.snakeColor); r.setProperty('--head',cfg.headColor); r.setProperty('--food',cfg.foodColor);
+    r.setProperty('--collision',cfg.collisionColor); r.setProperty('--board',cfg.boardColor); r.setProperty('--bg',cfg.bgColor);
+  }
+  function syncSettings(){
+    cfg.speed=Math.max(MIN_SPEED,Math.min(MAX_SPEED,Number(cfg.speed)||8));
+    cfg.initialLength=Math.max(MIN_LENGTH,Math.min(MAX_LENGTH,Math.round(Number(cfg.initialLength)||3)));
+    speedSlider.value=logToSlider(cfg.speed,MIN_SPEED,MAX_SPEED); setSpeed(cfg.speed,false);
+    $('initialLength').value=logToSlider(cfg.initialLength,MIN_LENGTH,MAX_LENGTH); $('initialLengthValue').textContent=cfg.initialLength;
+    $('boardSize').value=cfg.boardSize; $('boardSizeValue').textContent=cfg.boardSize+' %';
+    $('wallCollisionBtn').classList.toggle('active',cfg.wallCollision); $('wallCollisionValue').textContent=cfg.wallCollision?'Zapnuto':'Vypnuto';
+    $('selfCollisionBtn').classList.toggle('active',cfg.selfCollision); $('selfCollisionValue').textContent=cfg.selfCollision?'Zapnuto':'Vypnuto';
+    $('wallCollisionTopBtn').classList.toggle('active',cfg.wallCollision); $('wallCollisionTopBtn').setAttribute('aria-pressed',String(cfg.wallCollision));
+    $('selfCollisionTopBtn').classList.toggle('active',cfg.selfCollision); $('selfCollisionTopBtn').setAttribute('aria-pressed',String(cfg.selfCollision));
+    ['snakeColor','headColor','foodColor','collisionColor','helpColor','boardColor','bgColor'].forEach(id => $(id).value=cfg[id]);
+    setCssColors();
+    helpBtn.classList.toggle('active',cfg.helpEnabled);
+    helpBtn.setAttribute('aria-pressed',String(cfg.helpEnabled));
+    wideHeadBtn.classList.toggle('active',cfg.headWidth>1); wideHeadBtn.setAttribute('aria-pressed',String(cfg.headWidth>1)); wideHeadBtn.textContent=(cfg.language==='en'?'Head ':'Hlava ')+cfg.headWidth;
+    aiBtn.classList.toggle('active',cfg.aiEnabled); aiBtn.setAttribute('aria-pressed',String(cfg.aiEnabled));
+    document.body.classList.toggle('controls-hidden',cfg.controlsHidden);
+    $('showControlsBtn').classList.toggle('active',!cfg.controlsHidden); $('showControlsValue').textContent=cfg.controlsHidden?'Vypnuto':'Zapnuto';
+    $('gaplessSnakeBtn').classList.toggle('active',!!cfg.gaplessSnake); $('gaplessSnakeValue').textContent=cfg.gaplessSnake?'Zapnuto':'Vypnuto';
+    $('snake3dBtn').classList.toggle('active',!!cfg.snake3d); $('snake3dValue').textContent=cfg.snake3d?'Zapnuto':'Vypnuto';
+  }
+  function resizeBoard(){
+    const rect=wrap.getBoundingClientRect(), scale=cfg.boardSize/100;
+    cols=Math.max(10,Math.floor((rect.width-16)*scale/CELL));
+    rows=Math.max(8,Math.floor((rect.height-16)*scale/CELL));
+    canvas.width=cols*CELL; canvas.height=rows*CELL; draw();
+  }
+  function occupiedCells(){
+    const cells=new Set(snake.map(p=>p.x+','+p.y));
+    if(snake.length) headCells(snake[0].x,snake[0].y,direction).forEach(p=>cells.add(p.x+','+p.y));
+    return cells.size;
+  }
+  function updateAreaPercent(){
+    const percent=cols&&rows?Math.min(100,occupiedCells()/(cols*rows)*100):0;
+    areaPercentEl.textContent=percent.toFixed(2)+' %';
+    return percent;
+  }
+  function randomFood(){
+    const free=[];
+    for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) if(!snake.some(p=>p.x===x&&p.y===y)) free.push({x,y});
+    if(!free.length) return endGame(true);
+    food=free[Math.floor(Math.random()*free.length)];
+  }
+  function resetGame(){
+    resizeBoard();
+    const requestedLength=Math.max(2,Number(cfg.initialLength)||2);
+    const overlaps=requestedLength>cols;
+    if(overlaps){
+      cfg.wallCollision=false;
+      cfg.selfCollision=false;
+      $('wallCollisionBtn').classList.remove('active'); $('wallCollisionValue').textContent='Vypnuto';
+      $('selfCollisionBtn').classList.remove('active'); $('selfCollisionValue').textContent='Vypnuto';
+      $('wallCollisionTopBtn').classList.remove('active'); $('selfCollisionTopBtn').classList.remove('active');
+      saveSettings(); applyLanguage();
+    }
+    const x=Math.floor(cols/2), y=Math.floor(rows/2);
+    snake=Array.from({length:requestedLength},(_,i)=>({x:(x-i+cols)%cols,y}));
+    direction={x:1,y:0}; queuedDirection={x:1,y:0}; score=0; collisionFlash=[];
+    scoreEl.textContent=score; updateAreaPercent(); randomFood(); running=true; paused=false; gameActive=true;
+    pauseBtn.disabled=false; pauseBtn.textContent='Pauza'; lastStep=performance.now(); overlay.classList.remove('show'); requestAnimationFrame(loop);
+  }
+  function pauseGame(){ if(!gameActive||!running)return; running=false; paused=true; pauseBtn.textContent='Pokračovat'; }
+  function resumeGame(){ if(!gameActive||!paused)return; paused=false; running=true; pauseBtn.textContent='Pauza'; lastStep=performance.now(); requestAnimationFrame(loop); }
+  function togglePause(){ running?pauseGame():paused&&resumeGame(); }
+  function setDirection(x,y,button){
+    if(!running)return;
+    if(x===-direction.x&&y===-direction.y)return;
+    queuedDirection={x,y};
+    if(button){button.classList.add('active');setTimeout(()=>button.classList.remove('active'),90);}
+  }
+  function headCells(x,y,dir=direction){
+    const width=[1,3,5].includes(Number(cfg.headWidth))?Number(cfg.headWidth):1;
+    const px=dir.y, py=-dir.x, cells=[{x,y}];
+    for(let offset=1;offset<=(width-1)/2;offset++){
+      cells.push({x:(x+px*offset+cols)%cols,y:(y+py*offset+rows)%rows});
+      cells.push({x:(x-px*offset+cols)%cols,y:(y-py*offset+rows)%rows});
+    }
+    return cells;
+  }
+  function chooseAiDirection(){
+    if(!cfg.aiEnabled || !running) return;
+    const dirs=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+    const start=snake[0], key=(x,y)=>x+','+y;
+    const blocked=new Set((cfg.selfCollision?snake.slice(0,-1):[]).map(p=>key(p.x,p.y)));
+    const canUse=(x,y,d,isFirst)=>{
+      if(isFirst&&d.x===-direction.x&&d.y===-direction.y) return false;
+      if(cfg.wallCollision&&(x<0||x>=cols||y<0||y>=rows)) return false;
+      x=(x+cols)%cols; y=(y+rows)%rows;
+      if(!cfg.selfCollision) return true;
+      return !headCells(x,y,d).some(c=>blocked.has(key(c.x,c.y)));
+    };
+    // Nejkratší bezpečná cesta k jídlu. BFS zabrání kroužení a zbytečným obdélníkům.
+    const queue=[{x:start.x,y:start.y,first:null,dist:0}];
+    const visited=new Set([key(start.x,start.y)]);
+    let found=null;
+    for(let qi=0;qi<queue.length&&!found;qi++){
+      const node=queue[qi];
+      for(const d of dirs){
+        let nx=node.x+d.x, ny=node.y+d.y;
+        if(!canUse(nx,ny,d,node.dist===0)) continue;
+        nx=(nx+cols)%cols; ny=(ny+rows)%rows;
+        const k=key(nx,ny); if(visited.has(k)) continue;
+        const first=node.first||d;
+        if(headCells(nx,ny,d).some(c=>c.x===food.x&&c.y===food.y)){found=first;break;}
+        visited.add(k); queue.push({x:nx,y:ny,first,dist:node.dist+1});
+      }
+    }
+    if(found){queuedDirection=found;return;}
+    // Když statická cesta neexistuje, zvolí bezpečný krok, který se nejvíc přiblíží jídlu.
+    const candidates=dirs.filter(d=>{
+      const nx=start.x+d.x,ny=start.y+d.y;
+      return canUse(nx,ny,d,true);
+    }).map(d=>{
+      const nx=(start.x+d.x+cols)%cols,ny=(start.y+d.y+rows)%rows;
+      const dx=cfg.wallCollision?Math.abs(nx-food.x):Math.min(Math.abs(nx-food.x),cols-Math.abs(nx-food.x));
+      const dy=cfg.wallCollision?Math.abs(ny-food.y):Math.min(Math.abs(ny-food.y),rows-Math.abs(ny-food.y));
+      const turnPenalty=(d.x===direction.x&&d.y===direction.y)?0:.1;
+      return {d,score:dx+dy+turnPenalty};
+    }).sort((a,b)=>a.score-b.score);
+    if(candidates.length) queuedDirection=candidates[0].d;
+  }
+  function step(){
+    chooseAiDirection();
+    direction=queuedDirection;
+    let nx=snake[0].x+direction.x, ny=snake[0].y+direction.y;
+    if(cfg.wallCollision && (nx<0||nx>=cols||ny<0||ny>=rows)) return endGame(false,'Narazil jsi do stěny.');
+    nx=(nx+cols)%cols; ny=(ny+rows)%rows;
+    const head={x:nx,y:ny}, activeHead=headCells(nx,ny,direction), eats=activeHead.some(c=>c.x===food.x&&c.y===food.y);
+    const bodyToCheck=eats?snake:snake.slice(0,-1);
+    const hitsSelf=activeHead.some(c=>bodyToCheck.some(p=>p.x===c.x&&p.y===c.y));
+    if(hitsSelf && cfg.selfCollision) return endGame(false,'Had narazil sám do sebe.');
+    collisionFlash=hitsSelf?[{x:head.x,y:head.y}]:[];
+    snake.unshift(head);
+    if(eats){
+      score++; scoreEl.textContent=score;
+      if(score>best){best=score;bestEl.textContent=best;localStorage.setItem('had-best',String(best));}
+      randomFood();
+    } else snake.pop();
+    if(updateAreaPercent()>=100) return endGame(true);
+  }
+  function hexToRgb(hex){
+    const value=hex.replace('#','');
+    const full=value.length===3?value.split('').map(c=>c+c).join(''):value;
+    return {r:parseInt(full.slice(0,2),16),g:parseInt(full.slice(2,4),16),b:parseInt(full.slice(4,6),16)};
+  }
+  function shadeColor(hex,amount){
+    const c=hexToRgb(hex), clamp=v=>Math.max(0,Math.min(255,Math.round(v)));
+    return `rgb(${clamp(c.r+amount)},${clamp(c.g+amount)},${clamp(c.b+amount)})`;
+  }
+  function continuous3dProfile(color,t){
+    const base=hexToRgb(color),light=hexToRgb(shadeColor(color,72)),dark=hexToRgb(shadeColor(color,-68));
+    let out;
+    if(t<.22){const q=t/.22;out={r:light.r+(base.r-light.r)*q,g:light.g+(base.g-light.g)*q,b:light.b+(base.b-light.b)*q};}
+    else if(t>.78){const q=(t-.78)/.22;out={r:base.r+(dark.r-base.r)*q,g:base.g+(dark.g-base.g)*q,b:base.b+(dark.b-base.b)*q};}
+    else out={...base};
+    // Stejný jemný odlesk je součástí profilu rovných dílů i všech čtyř rohů.
+    if(t>=.10&&t<=.20){out.r+=(255-out.r)*.16;out.g+=(255-out.g)*.16;out.b+=(255-out.b)*.16;}
+    return out;
+  }
+  function putContinuous3dCell(x,y,color,vertical){
+    const image=ctx.createImageData(CELL,CELL),data=image.data;
+    for(let py=0;py<CELL;py++)for(let px=0;px<CELL;px++){
+      const t=vertical?px/(CELL-1):py/(CELL-1),c=continuous3dProfile(color,t),i=(py*CELL+px)*4;
+      data[i]=Math.round(c.r);data[i+1]=Math.round(c.g);data[i+2]=Math.round(c.b);data[i+3]=255;
+    }
+    ctx.putImageData(image,x,y);
+  }
+  function drawSnakeCell(part,color,gap,size,vertical=false){
+    const x=part.x*CELL+gap,y=part.y*CELL+gap;
+    if(!cfg.snake3d){ctx.fillStyle=color;ctx.fillRect(x,y,size,size);return;}
+    if(cfg.gaplessSnake){
+      putContinuous3dCell(x,y,color,vertical);
+      return;
+    }
+    const radius=Math.max(4,size*.28),gradient=ctx.createRadialGradient(x+size*.30,y+size*.25,size*.05,x+size*.52,y+size*.55,size*.72);
+    gradient.addColorStop(0,shadeColor(color,80)); gradient.addColorStop(.32,color); gradient.addColorStop(1,shadeColor(color,-75));
+    ctx.save(); ctx.shadowColor='rgba(0,0,0,.55)'; ctx.shadowBlur=Math.max(3,size*.18); ctx.shadowOffsetX=size*.10; ctx.shadowOffsetY=size*.13;
+    ctx.fillStyle=gradient; ctx.beginPath(); ctx.roundRect(x,y,size,size,radius); ctx.fill();
+    ctx.shadowColor='transparent'; ctx.strokeStyle='rgba(255,255,255,.38)'; ctx.lineWidth=Math.max(1,size*.055); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.36)'; ctx.beginPath(); ctx.ellipse(x+size*.32,y+size*.25,size*.16,size*.09,-.55,0,Math.PI*2); ctx.fill(); ctx.restore();
+  }
+  function wrappedStep(from,to,size){
+    let d=to-from;
+    if(d>1)d=-1; else if(d<-1)d=1;
+    return Math.sign(d);
+  }
+  function draw3dTurn(part,color,before,after){
+    if(!cfg.snake3d||!cfg.gaplessSnake||!before||!after) return;
+    const ax=wrappedStep(part.x,before.x,cols),ay=wrappedStep(part.y,before.y,rows);
+    const bx=wrappedStep(part.x,after.x,cols),by=wrappedStep(part.y,after.y,rows);
+    if((ax===bx&&ay===by)||(ax===-bx&&ay===-by)) return;
+    const x=part.x*CELL,y=part.y*CELL;
+    const hasLeft=ax<0||bx<0,hasUp=ay<0||by<0;
+    const corner=hasUp?(hasLeft?'UL':'UR'):(hasLeft?'DL':'DR');
+    const image=ctx.createImageData(CELL,CELL),data=image.data,base=hexToRgb(color);
+    for(let py=0;py<CELL;py++)for(let px=0;px<CELL;px++){
+      const u=px/(CELL-1),v=py/(CELL-1);
+      const h=continuous3dProfile(color,v),vert=continuous3dProfile(color,u);
+      const dH=corner[1]==='L'?u:1-u,dV=corner[0]==='U'?v:1-v;
+      // Na výstupních hranách je profil 100% shodný s rovnou částí.
+      // Směrem do středu se oba profily plynule utlumí do přesné základní barvy.
+      const edgeH=Math.max(0,1-dH/.56),edgeV=Math.max(0,1-dV/.56);
+      const centerFade=Math.min(1,Math.hypot(u-.5,v-.5)/.34);
+      let wH=edgeH*(1-edgeV*.55),wV=edgeV*(1-edgeH*.55);
+      const total=wH+wV;
+      if(total>1){wH/=total;wV/=total;}
+      wH*=centerFade;wV*=centerFade;
+      const wBase=Math.max(0,1-wH-wV),i=(py*CELL+px)*4;
+      data[i]=Math.round(base.r*wBase+h.r*wH+vert.r*wV);
+      data[i+1]=Math.round(base.g*wBase+h.g*wH+vert.g*wV);
+      data[i+2]=Math.round(base.b*wBase+h.b*wH+vert.b*wV);data[i+3]=255;
+    }
+    // Poslední řádek/sloupec na napojených stranách přepíšeme přesným profilem.
+    const setPixel=(px,py,c)=>{const i=(py*CELL+px)*4;data[i]=Math.round(c.r);data[i+1]=Math.round(c.g);data[i+2]=Math.round(c.b);data[i+3]=255;};
+    const hx=corner[1]==='L'?0:CELL-1,vy=corner[0]==='U'?0:CELL-1;
+    for(let py=0;py<CELL;py++)setPixel(hx,py,continuous3dProfile(color,py/(CELL-1)));
+    for(let px=0;px<CELL;px++)setPixel(px,vy,continuous3dProfile(color,px/(CELL-1)));
+    ctx.putImageData(image,x,y);
+  }
+  function drawFood(){
+    if(!food)return;
+    const cx=food.x*CELL+CELL/2,cy=food.y*CELL+CELL/2,r=CELL*.32;
+    if(!cfg.snake3d){ctx.fillStyle=cfg.foodColor;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();return;}
+    const gradient=ctx.createRadialGradient(cx-r*.38,cy-r*.42,r*.08,cx,cy,r);
+    gradient.addColorStop(0,shadeColor(cfg.foodColor,105));gradient.addColorStop(.30,cfg.foodColor);gradient.addColorStop(1,shadeColor(cfg.foodColor,-90));
+    ctx.save();ctx.shadowColor='rgba(0,0,0,.65)';ctx.shadowBlur=r*.65;ctx.shadowOffsetX=r*.25;ctx.shadowOffsetY=r*.32;
+    ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();
+    ctx.shadowColor='transparent';ctx.fillStyle='rgba(255,255,255,.55)';ctx.beginPath();ctx.ellipse(cx-r*.34,cy-r*.38,r*.20,r*.12,-.55,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+  function drawSeamless3dSnake(){
+    const key=(x,y)=>x+','+y;
+    const bodyCells=new Map();
+    snake.forEach((part,i)=>bodyCells.set(key(part.x,part.y),{...part,color:i===0?cfg.headColor:cfg.snakeColor}));
+    if(snake.length)headCells(snake[0].x,snake[0].y,direction).forEach(part=>bodyCells.set(key(part.x,part.y),{...part,color:cfg.headColor}));
+    // Nejdřív se celé tělo vyplní souvislou základní barvou. Mezi dílky nevzniká žádný přechod.
+    bodyCells.forEach(cell=>{ctx.fillStyle=cell.color;ctx.fillRect(cell.x*CELL,cell.y*CELL,CELL,CELL);});
+    const has=(x,y)=>bodyCells.has(key((x+cols)%cols,(y+rows)%rows));
+    const band=Math.max(3,Math.round(CELL*.16));
+    bodyCells.forEach(cell=>{
+      const x=cell.x*CELL,y=cell.y*CELL;
+      // 3D světlo a stín se kreslí jen na skutečném vnějším obvodu hada, nikdy na spojích dílků.
+      if(!has(cell.x,cell.y-1)){
+        const g=ctx.createLinearGradient(0,y,0,y+band);g.addColorStop(0,shadeColor(cell.color,88));g.addColorStop(1,cell.color);
+        ctx.fillStyle=g;ctx.fillRect(x,y,CELL,band);
+      }
+      if(!has(cell.x-1,cell.y)){
+        const g=ctx.createLinearGradient(x,0,x+band,0);g.addColorStop(0,shadeColor(cell.color,65));g.addColorStop(1,cell.color);
+        ctx.fillStyle=g;ctx.fillRect(x,y,band,CELL);
+      }
+      if(!has(cell.x,cell.y+1)){
+        const g=ctx.createLinearGradient(0,y+CELL-band,0,y+CELL);g.addColorStop(0,cell.color);g.addColorStop(1,shadeColor(cell.color,-82));
+        ctx.fillStyle=g;ctx.fillRect(x,y+CELL-band,CELL,band);
+      }
+      if(!has(cell.x+1,cell.y)){
+        const g=ctx.createLinearGradient(x+CELL-band,0,x+CELL,0);g.addColorStop(0,cell.color);g.addColorStop(1,shadeColor(cell.color,-62));
+        ctx.fillStyle=g;ctx.fillRect(x+CELL-band,y,band,CELL);
+      }
+    });
+  }
+  function draw(){
+    ctx.fillStyle=cfg.boardColor; ctx.fillRect(0,0,canvas.width,canvas.height);
+    if(cfg.helpEnabled && snake.length){
+      const h=snake[0], half=(cfg.headWidth-1)/2;
+      ctx.save();
+      ctx.fillStyle=cfg.helpColor+'33';
+      if(direction.x!==0){
+        for(let offset=-half;offset<=half;offset++){
+          const y=(h.y+offset+rows)%rows;
+          ctx.fillRect(0,y*CELL,canvas.width,CELL);
+        }
+      }else{
+        for(let offset=-half;offset<=half;offset++){
+          const x=(h.x+offset+cols)%cols;
+          ctx.fillRect(x*CELL,0,CELL,canvas.height);
+        }
+      }
+      ctx.fillStyle=cfg.helpColor; ctx.globalAlpha=.28;
+      const paintForward=(hx,hy)=>{
+        if(direction.x>0) ctx.fillRect((hx+1)*CELL,hy*CELL,Math.max(0,canvas.width-(hx+1)*CELL),CELL);
+        else if(direction.x<0) ctx.fillRect(0,hy*CELL,Math.max(0,hx*CELL),CELL);
+        else if(direction.y>0) ctx.fillRect(hx*CELL,(hy+1)*CELL,CELL,Math.max(0,canvas.height-(hy+1)*CELL));
+        else if(direction.y<0) ctx.fillRect(hx*CELL,0,CELL,Math.max(0,hy*CELL));
+      };
+      headCells(h.x,h.y,direction).forEach(c=>paintForward(c.x,c.y));
+      ctx.restore();
+    }
+    ctx.strokeStyle='rgba(255,255,255,.055)'; ctx.lineWidth=1;
+    for(let x=0;x<=cols;x++){ctx.beginPath();ctx.moveTo(x*CELL+.5,0);ctx.lineTo(x*CELL+.5,canvas.height);ctx.stroke();}
+    for(let y=0;y<=rows;y++){ctx.beginPath();ctx.moveTo(0,y*CELL+.5);ctx.lineTo(canvas.width,y*CELL+.5);ctx.stroke();}
+    drawFood();
+    const cellGap=cfg.gaplessSnake?0:2, cellSize=CELL-cellGap*2;
+    if(cfg.snake3d&&cfg.gaplessSnake){
+      drawSeamless3dSnake();
+    }else{
+      snake.forEach((part,i)=>{
+        const collided=collisionFlash.some(p=>p.x===part.x&&p.y===part.y);
+        const color=collided?cfg.collisionColor:(i===0?cfg.headColor:cfg.snakeColor);
+        drawSnakeCell(part,color,cellGap,cellSize,direction.y!==0);
+      });
+      if(cfg.headWidth>1&&snake.length){
+        headCells(snake[0].x,snake[0].y,direction).slice(1).forEach(part=>drawSnakeCell(part,cfg.headColor,cellGap,cellSize,direction.y!==0));
+      }
+    }
+  }
+  function loop(now){
+    if(!running)return;
+    while(running&&now-lastStep>=stepMs){step();lastStep+=stepMs;}
+    draw(); if(running)requestAnimationFrame(loop);
+  }
+  function endGame(won,reason=''){
+    running=false;paused=false;gameActive=false;pauseBtn.disabled=true;pauseBtn.textContent='Pauza';draw();
+    message.textContent=won?'Vyhráno!':'Konec hry';
+    detail.textContent=(reason?reason+' ':'')+`Skóre: ${score}. Stiskni Enter, mezerník nebo tlačítko níže pro novou hru.`;
+    startBtn.textContent='Hrát znovu';overlay.classList.add('show');
+  }
+  function setSpeed(value,save=true){
+    stepsPerSecond=Number(value); cfg.speed=stepsPerSecond; stepMs=1000/stepsPerSecond;
+    speedValue.textContent=stepsPerSecond.toFixed(1)+' Hz';
+    if(save)saveSettings(); if(running)lastStep=performance.now();
+  }
+  function toggleSettings(show){
+    const visible=show??!settingsPanel.classList.contains('show');
+    settingsPanel.classList.toggle('show',visible);settingsBtn.setAttribute('aria-expanded',String(visible));
+  }
+
+
+  const languages={
+    cs:{score:'Skóre',best:'Rekord',speed:'Rychlost',pause:'Pauza',resume:'Pokračovat',help:'Nápověda',wide:'Hlava',ai:'AI',settings:'Nastavení',area:'Plocha',headWidth:'Šířka hlavy',wallsShort:'Stěny',selfShort:'Sebe',start:'Spustit hru',newGame:'Nová hra',language:'Jazyk',initialLength:'Počáteční dílky',boardSize:'Velikost plochy',wallCollision:'Kolize se stěnami',selfCollision:'Kolize se sebou',showControls:'Ukázat šipky',gaplessSnake:'Dílky hada bez mezer',snake3d:'3D vzhled hada',version:'Verze',schemes:'Barevná schémata',more:'Více',less:'Méně',random:'Náhodné',customColors:'Vlastní barvy',colors:['Had','Hlava','Jídlo','Kolize','Nápověda','Plocha','Pozadí'],schemeNames:['Les','Oceán','Západ','Led','Mono','Candy','Láva','Neon','Poušť','Royal','Jaro','Retro','Arktida','Podzim','Matrix','Bobule','Zlato','Pastel'],reset:'Výchozí',done:'Hotovo',on:'Zapnuto',off:'Vypnuto',title:'Lukášův had',intro:'Ovládej šipkami, klávesami WASD nebo tlačítky. Mezerník vždy zapíná a vypíná pauzu. Nápověda zvýrazní směr jízdy. AI spustí automatické hraní. Tlačítko Hlava postupně mění šířku na 1, 3 a 5 dílků.',canvas:'Hra Had',touch:'Dotykové ovládání',dirs:['Nahoru','Vlevo','Dolů','Vpravo']},
+    en:{score:'Score',best:'Best',speed:'Speed',pause:'Pause',resume:'Resume',help:'Help',wide:'Head',ai:'AI',settings:'Settings',area:'Area',headWidth:'Head width',wallsShort:'Walls',selfShort:'Self',start:'Start game',newGame:'New game',language:'Language',initialLength:'Initial segments',boardSize:'Board size',wallCollision:'Wall collision',selfCollision:'Self collision',showControls:'Show arrows',gaplessSnake:'Snake segments without gaps',snake3d:'3D snake appearance',version:'Version',schemes:'Color schemes',more:'More',less:'Less',random:'Random',customColors:'Custom colors',colors:['Snake','Head','Food','Collision','Help','Board','Background'],schemeNames:['Forest','Ocean','Sunset','Ice','Mono','Candy','Lava','Neon','Desert','Royal','Spring','Retro','Arctic','Autumn','Matrix','Berry','Gold','Pastel'],reset:'Defaults',done:'Done',on:'On',off:'Off',title:"Lukas's Snake",intro:'Control with arrow keys, WASD, or the buttons. Space always pauses and resumes the game. Help highlights the direction of travel. AI plays automatically. The Head button cycles the head width through 1, 3, and 5 segments.',canvas:'Snake game',touch:'Touch controls',dirs:['Up','Left','Down','Right']}
+  };
+  function applyLanguage(){
+    const t=languages[cfg.language]||languages.cs;
+    document.documentElement.lang=cfg.language||'cs';
+    document.title=t.title+' - v35';
+    document.querySelector('.score').childNodes[0].nodeValue=t.score+': ';
+    document.querySelector('.best').childNodes[0].nodeValue=t.best+': ';
+    document.querySelector('.speed-control').childNodes[0].nodeValue=' '+t.speed+' ';
+    pauseBtn.textContent=paused?t.resume:t.pause;
+    helpBtn.textContent=t.help; wideHeadBtn.textContent=t.wide+' '+cfg.headWidth; aiBtn.textContent=t.ai;
+    $('englishBtn').textContent=cfg.language==='en'?'Čeština':'English';
+    $('languageButtonLabel').textContent=t.language;
+    newGameBtn.textContent=t.newGame; settingsBtn.textContent=t.settings; $('areaLabel').textContent=t.area; $('headWidthLabel').textContent=t.headWidth;
+    $('settingsTitle').textContent=t.title;
+    const labelMap={initialLength:t.initialLength,boardSize:t.boardSize,wallCollision:t.wallCollision,selfCollision:t.selfCollision,showControls:t.showControls,gaplessSnake:t.gaplessSnake,snake3d:t.snake3d};
+    Object.entries(labelMap).forEach(([id,text])=>{const label=document.querySelector(`label[for="${id}"]`);if(label)label.textContent=text;});
+    const versionLabel=document.querySelector('#settingsPanel .setting .value')?.parentElement?.querySelector('label');
+    document.querySelectorAll('#settingsPanel .setting').forEach(row=>{const v=row.querySelector('.value');if(v&&v.textContent==='35')row.querySelector('label').textContent=t.version;});
+    const schemesLabel=document.querySelector('.schemes').previousElementSibling; if(schemesLabel)schemesLabel.textContent=t.schemes;
+    document.querySelectorAll('.scheme-btn[data-scheme]').forEach((btn,i)=>btn.textContent=t.schemeNames[i]);
+    $('moreColorsBtn').textContent=$('moreColorsPanel').classList.contains('show')?t.less:t.more; $('randomColorsBtn').textContent=t.random; $('customColorsLabel').textContent=t.customColors;
+    document.querySelectorAll('.color-setting').forEach((label,i)=>{label.childNodes[0].nodeValue=t.colors[i]+' ';});
+    $('resetSettingsBtn').textContent=t.reset; $('closeSettingsBtn').textContent=t.done;
+    const stateText=(id,value)=>$(id).textContent=value?t.on:t.off;
+    stateText('wallCollisionValue',cfg.wallCollision); stateText('selfCollisionValue',cfg.selfCollision); stateText('showControlsValue',!cfg.controlsHidden); stateText('gaplessSnakeValue',cfg.gaplessSnake); stateText('snake3dValue',cfg.snake3d);
+    $('wallCollisionTopBtn').textContent=t.wallsShort+': '+(cfg.wallCollision?t.on:t.off); $('wallCollisionTopBtn').classList.toggle('active',cfg.wallCollision);
+    $('selfCollisionTopBtn').textContent=t.selfShort+': '+(cfg.selfCollision?t.on:t.off); $('selfCollisionTopBtn').classList.toggle('active',cfg.selfCollision);
+    message.textContent=gameActive?message.textContent:t.title; detail.textContent=gameActive?detail.textContent:t.intro;
+    if(!gameActive) startBtn.textContent=t.start;
+    canvas.setAttribute('aria-label',t.canvas); $('controls').setAttribute('aria-label',t.touch);
+    ['up','left','down','right'].forEach((id,i)=>$(id).setAttribute('aria-label',t.dirs[i]));
+    settingsPanel.setAttribute('aria-label',t.settings);
+  }
+
+  const keyMap={ArrowUp:[0,-1],KeyW:[0,-1],ArrowDown:[0,1],KeyS:[0,1],ArrowLeft:[-1,0],KeyA:[-1,0],ArrowRight:[1,0],KeyD:[1,0]};
+  document.addEventListener('keydown',e=>{
+    if(keyMap[e.code]){e.preventDefault();setDirection(...keyMap[e.code]);}
+    else if(e.code==='Space'){e.preventDefault();if(!gameActive)resetGame();else togglePause();}
+    else if(e.code==='KeyP'||e.code==='Escape'){e.preventDefault();togglePause();}
+    else if(e.code==='Enter'&&!gameActive){e.preventDefault();resetGame();}
+  },{passive:false});
+  document.querySelectorAll('.control').forEach(btn=>{
+    const dirs={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+    btn.addEventListener('pointerdown',e=>{e.preventDefault();setDirection(...dirs[btn.dataset.dir],btn);});
+  });
+  $('englishBtn').addEventListener('click',()=>{cfg.language=cfg.language==='en'?'cs':'en';saveSettings();applyLanguage();});
+  speedSlider.addEventListener('input',e=>{const raw=sliderToLog(e.target.value,MIN_SPEED,MAX_SPEED);const value=raw<10?Math.round(raw*10)/10:Math.round(raw);setSpeed(value);}); speedSlider.addEventListener('pointerup',()=>speedSlider.blur()); speedSlider.addEventListener('change',()=>speedSlider.blur());
+  $('initialLength').addEventListener('input',e=>{cfg.initialLength=Math.max(MIN_LENGTH,Math.min(MAX_LENGTH,Math.round(sliderToLog(e.target.value,MIN_LENGTH,MAX_LENGTH))));$('initialLengthValue').textContent=cfg.initialLength;saveSettings();});
+  $('boardSize').addEventListener('input',e=>{cfg.boardSize=Number(e.target.value);$('boardSizeValue').textContent=cfg.boardSize+' %';saveSettings();resizeBoard();if(gameActive)resetGame();});
+  function toggleCollision(id){
+    cfg[id]=!cfg[id];
+    const t=languages[cfg.language]||languages.cs;
+    $(id+'Btn').classList.toggle('active',cfg[id]);
+    $(id+'Value').textContent=cfg[id]?t.on:t.off;
+    const topId=id==='wallCollision'?'wallCollisionTopBtn':'selfCollisionTopBtn';
+    const shortLabel=id==='wallCollision'?t.wallsShort:t.selfShort;
+    $(topId).classList.toggle('active',cfg[id]); $(topId).setAttribute('aria-pressed',String(cfg[id]));
+    $(topId).textContent=shortLabel+': '+(cfg[id]?t.on:t.off);
+    saveSettings();
+  }
+  $('wallCollisionBtn').addEventListener('click',()=>toggleCollision('wallCollision'));
+  $('selfCollisionBtn').addEventListener('click',()=>toggleCollision('selfCollision'));
+  $('wallCollisionTopBtn').addEventListener('click',()=>toggleCollision('wallCollision'));
+  $('selfCollisionTopBtn').addEventListener('click',()=>toggleCollision('selfCollision'));
+  ['snakeColor','headColor','foodColor','collisionColor','helpColor','boardColor','bgColor'].forEach(id=>$(id).addEventListener('input',e=>{cfg[id]=e.target.value;setCssColors();saveSettings();draw();}));
+  const colorSchemes={
+    forest:{snakeColor:'#39d353',headColor:'#8cff9a',foodColor:'#ff4d4d',collisionColor:'#ffd43b',helpColor:'#8cff9a',boardColor:'#0b1710',bgColor:'#07110b'},
+    ocean:{snakeColor:'#36c5f0',headColor:'#a7efff',foodColor:'#ffb703',collisionColor:'#fb5607',helpColor:'#48cae4',boardColor:'#08243a',bgColor:'#061726'},
+    sunset:{snakeColor:'#ff8a3d',headColor:'#ffd166',foodColor:'#ef476f',collisionColor:'#fff3b0',helpColor:'#ff9f1c',boardColor:'#321739',bgColor:'#241025'},
+    ice:{snakeColor:'#168aad',headColor:'#90e0ef',foodColor:'#e63946',collisionColor:'#ffb703',helpColor:'#48cae4',boardColor:'#dff3fb',bgColor:'#bde0ef'},
+    mono:{snakeColor:'#eeeeee',headColor:'#ffffff',foodColor:'#ffdf00',collisionColor:'#ff4040',helpColor:'#bbbbbb',boardColor:'#1a1a1a',bgColor:'#080808'},
+    candy:{snakeColor:'#ff57b9',headColor:'#ffc8ec',foodColor:'#7bf1a8',collisionColor:'#ffe66d',helpColor:'#c77dff',boardColor:'#32184b',bgColor:'#251338'},
+    lava:{snakeColor:'#ff3d00',headColor:'#ff9e80',foodColor:'#ffd600',collisionColor:'#ffffff',helpColor:'#ff6e40',boardColor:'#2b0803',bgColor:'#170200'},
+    neon:{snakeColor:'#00ff9d',headColor:'#baffea',foodColor:'#ff2bd6',collisionColor:'#fff500',helpColor:'#00d9ff',boardColor:'#100525',bgColor:'#070017'},
+    desert:{snakeColor:'#d9a441',headColor:'#ffe0a3',foodColor:'#d1495b',collisionColor:'#fff3b0',helpColor:'#e6b85c',boardColor:'#5a3b22',bgColor:'#2d1d12'},
+    royal:{snakeColor:'#9d7cff',headColor:'#d8ccff',foodColor:'#ffcc4d',collisionColor:'#ff6b8a',helpColor:'#b79cff',boardColor:'#21134a',bgColor:'#130b2e'},
+    spring:{snakeColor:'#63c174',headColor:'#b8ef9c',foodColor:'#f15b5d',collisionColor:'#ffb703',helpColor:'#78c091',boardColor:'#eaf8df',bgColor:'#cdebbd'},
+    retro:{snakeColor:'#c7f464',headColor:'#f4ffb0',foodColor:'#ff6b35',collisionColor:'#ffe66d',helpColor:'#7bd389',boardColor:'#294936',bgColor:'#15271d'},
+    arctic:{snakeColor:'#d9fbff',headColor:'#ffffff',foodColor:'#ff6b81',collisionColor:'#ffd166',helpColor:'#90e0ef',boardColor:'#0b3148',bgColor:'#071c2c'},
+    autumn:{snakeColor:'#d97904',headColor:'#ffc15e',foodColor:'#a4161a',collisionColor:'#ffe169',helpColor:'#f4a261',boardColor:'#4a250b',bgColor:'#2b1607'},
+    matrix:{snakeColor:'#00ff41',headColor:'#b6ffca',foodColor:'#ffffff',collisionColor:'#ff1744',helpColor:'#00c853',boardColor:'#041006',bgColor:'#020802'},
+    berry:{snakeColor:'#d94f9d',headColor:'#ffb4df',foodColor:'#9ef01a',collisionColor:'#ffd60a',helpColor:'#c77dff',boardColor:'#3b0a32',bgColor:'#26051f'},
+    gold:{snakeColor:'#ffd700',headColor:'#fff1a6',foodColor:'#ff5c35',collisionColor:'#ffffff',helpColor:'#e9c46a',boardColor:'#382500',bgColor:'#211600'},
+    pastel:{snakeColor:'#82c0cc',headColor:'#cdeff2',foodColor:'#ff8fab',collisionColor:'#ffd166',helpColor:'#a8dadc',boardColor:'#edf7ed',bgColor:'#dbead7'}
+  };
+  document.querySelectorAll('.scheme-btn[data-scheme]').forEach(btn=>btn.addEventListener('click',()=>{
+    Object.assign(cfg,colorSchemes[btn.dataset.scheme]); syncSettings(); saveSettings(); draw();
+  }));
+  $('moreColorsBtn').addEventListener('click',()=>{
+    const shown=$('moreColorsPanel').classList.toggle('show'); $('moreColorsBtn').classList.toggle('active',shown);
+    const t=languages[cfg.language]||languages.cs; $('moreColorsBtn').textContent=shown?t.less:t.more;
+  });
+  $('randomColorsBtn').addEventListener('click',()=>{
+    const randomColor=()=>{const hue=Math.floor(Math.random()*360),sat=60+Math.floor(Math.random()*36),light=28+Math.floor(Math.random()*48);const c=document.createElement('canvas').getContext('2d');c.fillStyle=`hsl(${hue} ${sat}% ${light}%)`;return c.fillStyle;};
+    ['snakeColor','headColor','foodColor','collisionColor','helpColor','boardColor','bgColor'].forEach(id=>cfg[id]=randomColor());
+    syncSettings(); saveSettings(); draw();
+  });
+  $('resetSettingsBtn').addEventListener('click',()=>{cfg={...defaults};syncSettings();applyLanguage();saveSettings();resizeBoard();if(gameActive)resetGame();});
+  settingsBtn.addEventListener('click',()=>toggleSettings()); $('closeSettingsBtn').addEventListener('click',()=>toggleSettings(false));
+  helpBtn.addEventListener('click',()=>{
+    cfg.helpEnabled=!cfg.helpEnabled;
+    helpBtn.classList.toggle('active',cfg.helpEnabled);
+    helpBtn.setAttribute('aria-pressed',String(cfg.helpEnabled));
+    saveSettings(); draw();
+  });
+  wideHeadBtn.addEventListener('click',()=>{
+    cfg.headWidth=cfg.headWidth===1?3:(cfg.headWidth===3?5:1);
+    wideHeadBtn.classList.toggle('active',cfg.headWidth>1);
+    wideHeadBtn.setAttribute('aria-pressed',String(cfg.headWidth>1));
+    wideHeadBtn.textContent=(cfg.language==='en'?'Head ':'Hlava ')+cfg.headWidth;
+    saveSettings(); draw();
+  });
+  aiBtn.addEventListener('click',()=>{
+    cfg.aiEnabled=!cfg.aiEnabled;
+    aiBtn.classList.toggle('active',cfg.aiEnabled);
+    aiBtn.setAttribute('aria-pressed',String(cfg.aiEnabled));
+    saveSettings();
+  });
+  $('gaplessSnakeBtn').addEventListener('click',()=>{cfg.gaplessSnake=!cfg.gaplessSnake;$('gaplessSnakeBtn').classList.toggle('active',cfg.gaplessSnake);$('gaplessSnakeValue').textContent=cfg.gaplessSnake?(languages[cfg.language]||languages.cs).on:(languages[cfg.language]||languages.cs).off;saveSettings();draw();});
+  $('snake3dBtn').addEventListener('click',()=>{cfg.snake3d=!cfg.snake3d;$('snake3dBtn').classList.toggle('active',cfg.snake3d);$('snake3dValue').textContent=cfg.snake3d?(languages[cfg.language]||languages.cs).on:(languages[cfg.language]||languages.cs).off;saveSettings();draw();});
+  $('showControlsBtn').addEventListener('click',()=>{cfg.controlsHidden=!cfg.controlsHidden;const shown=!cfg.controlsHidden;$('showControlsBtn').classList.toggle('active',shown);document.body.classList.toggle('controls-hidden',cfg.controlsHidden);$('showControlsValue').textContent=shown?(languages[cfg.language]||languages.cs).on:(languages[cfg.language]||languages.cs).off;saveSettings();resizeBoard();});
+  startBtn.addEventListener('click',resetGame); newGameBtn.addEventListener('click',resetGame); pauseBtn.addEventListener('click',togglePause);
+  window.addEventListener('resize',()=>{resizeBoard();if(gameActive)resetGame();});
+  syncSettings(); applyLanguage(); resizeBoard();
+})();
+</script>
+</body>
+</html>

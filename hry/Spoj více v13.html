@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Spoj víc">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#05070b">
+<title>Lukášovo spoj více</title>
+<style>
+:root{--bg:#05070b;--panel:#111827e8;--text:#f8fafc;--muted:#94a3b8;--line:#334155;--accent:#ffd54a}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:Arial,sans-serif;touch-action:none;user-select:none;color:var(--text)}
+canvas{display:block;width:100%;height:100%}
+#top{position:fixed;left:0;right:0;top:0;z-index:3;display:flex;align-items:center;gap:9px;padding:max(8px,env(safe-area-inset-top)) max(66px,calc(env(safe-area-inset-right) + 58px)) 8px max(10px,env(safe-area-inset-left));background:linear-gradient(#05070bf2,#05070bbb,transparent);pointer-events:none}
+.title{font-weight:900;font-size:clamp(18px,4vw,27px);white-space:nowrap}.actions{margin-left:auto;display:flex;gap:7px;pointer-events:auto}.actions button,.actions select{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:12px;padding:9px 10px;font-size:15px;font-weight:800;cursor:pointer}.actions button:disabled{opacity:.35;cursor:default}.setting{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;font-weight:800}.setting select{padding:8px 6px}@media(max-width:570px){.title{display:none}.actions{margin-left:0;width:100%;justify-content:center}.actions button,.actions select{padding:8px 7px;font-size:13px}}
+#hud{position:fixed;left:0;right:0;bottom:max(9px,env(safe-area-inset-bottom));z-index:3;text-align:center;color:#fff;pointer-events:none;text-shadow:0 1px 4px #000}.mainStats{display:flex;justify-content:center;gap:25px}.value{font-size:26px;font-weight:bold}.label{font-size:10px;color:var(--muted);font-weight:bold}.detail{margin-top:4px;font-size:16px;color:var(--muted)}#maximum{color:var(--accent);font-weight:bold}
+#overlay{display:none;position:fixed;inset:0;z-index:10;background:#020617c9;place-items:center;padding:22px}#overlay.show{display:grid}.modal{width:min(430px,100%);padding:25px;background:#111827;border:1px solid var(--line);border-radius:23px;text-align:center;box-shadow:0 20px 55px #000b}.modal h1{margin:0 0 8px}.modal p{color:var(--muted);line-height:1.45}.modal button{border:0;border-radius:14px;padding:12px 20px;background:linear-gradient(90deg,#0ea5e9,#7c3aed);color:white;font-size:17px;font-weight:900;cursor:pointer}
+
+#settingsWrap{position:fixed;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));z-index:12;touch-action:auto}
+#settingsButton{width:44px;height:44px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:#fff;font-size:24px;cursor:pointer;box-shadow:0 3px 12px #0008}
+#settingsPanel{display:none;position:absolute;top:52px;right:0;width:min(350px,calc(100vw - 20px));max-height:calc(100vh - 72px);overflow:auto;padding:15px 16px;border:1px solid var(--line);border-radius:15px;background:#111827f7;color:#fff;box-shadow:0 12px 36px #000b}
+#settingsPanel.open{display:block}#settingsPanel h2{margin:0 0 12px;font-size:20px}.settingBlock{margin:12px 0}.settingBlock label{display:flex;justify-content:space-between;gap:12px;margin-bottom:6px;font-size:14px}.settingBlock output{color:var(--accent);font-weight:900}.settingBlock input[type=range]{width:100%;accent-color:var(--accent)}
+.optionRow{display:flex;align-items:center;justify-content:space-between;gap:15px;margin:14px 0;font-size:14px}.optionRow input[type=checkbox]{width:22px;height:22px;accent-color:var(--accent)}.optionRow select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#0b1220;color:#fff;font-weight:700}
+#paletteTitle{margin:16px 0 8px;font-size:14px;font-weight:900}.colorRow{display:grid;grid-template-columns:25px 39px 1fr 31px 31px;align-items:center;gap:6px;padding:5px;border:1px solid var(--line);border-radius:9px;margin:6px 0;background:#0b1220}.colorIndex{text-align:center;color:var(--accent);font-weight:900}.colorPicker{width:36px;height:30px;padding:0;border:0;background:transparent}.colorHex{min-width:0;padding:7px;border:1px solid var(--line);border-radius:6px;background:#05070b;color:#fff;font:12px monospace;text-transform:uppercase}.moveColor{height:30px;border:1px solid var(--line);border-radius:6px;background:#263449;color:#fff}.moveColor:disabled{opacity:.25}
+#settingsHint{margin-top:10px;color:var(--muted);font-size:12px;line-height:1.4}
+@media(max-width:570px){#top{padding-right:max(62px,calc(env(safe-area-inset-right) + 56px));padding-left:max(6px,env(safe-area-inset-left))}#settingsWrap{right:max(8px,env(safe-area-inset-right))}}
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Lukášovo spoj více"></canvas>
+<header id="top"><div class="title" data-i18n="title">Lukášovo spoj více</div><div class="actions"><button id="undo" disabled title="Vrátit poslední tah">↶ <span data-i18n="undo">Zpět</span></button><button id="restart" title="Nová hra">↻ <span data-i18n="newShort">Nová</span></button></div></header>
+
+<div id="settingsWrap">
+  <button id="settingsButton" type="button" aria-label="Otevřít nastavení" aria-expanded="false">⚙</button>
+  <div id="settingsPanel">
+    <h2 data-i18n="settings">Nastavení hry</h2>
+    <div class="optionRow"><label for="languageSelect" data-i18n="language">Jazyk</label><select id="languageSelect"><option value="cs">Čeština</option><option value="en">English</option></select></div>
+    <div class="settingBlock"><label for="colorsRange"><span data-i18n="colors">Počet barev</span><output id="colorsValue">5</output></label><input id="colorsRange" type="range" min="3" max="7" value="5" step="1"></div>
+    <div class="settingBlock"><label for="colsRange"><span data-i18n="cols">Počet sloupečků</span><output id="colsValue">8</output></label><input id="colsRange" type="range" min="3" max="33" value="8" step="1"></div>
+    <div class="settingBlock"><label for="rowsRange"><span data-i18n="rows">Počet řádků</span><output id="rowsValue">11</output></label><input id="rowsRange" type="range" min="3" max="33" value="11" step="1"></div>
+    <div class="settingBlock"><label for="boardWidthRange"><span data-i18n="width">Šířka hracího pole</span><output id="boardWidthValue">100 %</output></label><input id="boardWidthRange" type="range" min="35" max="100" value="100" step="5"></div>
+    <div class="optionRow"><label for="infiniteEnabled" data-i18n="infinite">Nekonečný režim</label><input id="infiniteEnabled" type="checkbox"></div>
+    <div class="optionRow"><label for="diagonalEnabled" data-i18n="diagonal">Diagonálně spojené patří k sobě</label><input id="diagonalEnabled" type="checkbox" checked></div>
+    <div id="paletteTitle" data-i18n="palette">Barvy a jejich pořadí</div><div id="paletteEditor"></div>
+    <div id="settingsHint" data-i18n="hint">Změna počtu barev, sloupců nebo řádků založí novou hru. Šířku pole lze měnit bez restartu. Nastavení se ukládá do tohoto prohlížeče.</div>
+  </div>
+</div>
+<div id="hud"><div class="mainStats"><div><div class="label" data-i18n="score">SKÓRE</div><div class="value" id="score">0</div></div><div><div class="label" data-i18n="left">ZBÝVÁ</div><div class="value" id="left">0</div></div><div><div class="label" data-i18n="best">REKORD</div><div class="value" id="best">0</div></div></div><div class="detail" id="lastMove">Vyber skupinu nebo jedno kolečko</div><div class="detail" id="maximum">Maximum za 1 tah: 0</div></div>
+<div id="overlay"><div class="modal"><h1 id="endTitle">Deska vyčištěna!</h1><p id="endText"></p><button id="again" data-i18n="newGame">Nová hra</button></div></div>
+<script>
+(()=>{'use strict';
+let ROWS=Math.min(33,Math.max(3,+(localStorage.getItem('gravity-rows')||11))),COLS=Math.min(33,Math.max(3,+(localStorage.getItem('gravity-cols')||8)));
+let PALETTE=JSON.parse(localStorage.getItem('gravity-palette')||'null')||['#e84646','#4682e6','#50c878','#fad246','#b45ac8','#20c4c7','#f58ab3'];
+let lang=localStorage.getItem('gravity-language')||'cs';
+let colorCount=+(localStorage.getItem('gravity-colors')||5), infinite=localStorage.getItem('gravity-infinite')==='1', boardWidth=+(localStorage.getItem('gravity-board-width')||100), diagonal=localStorage.getItem('gravity-diagonal')!=='0';
+const FALL_MS=300, SHIFT_MS=260, POP_MS=170, HEADER=68, FOOTER=132;
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score'),leftEl=document.getElementById('left'),bestEl=document.getElementById('best'),lastEl=document.getElementById('lastMove'),maxEl=document.getElementById('maximum'),undoBtn=document.getElementById('undo');
+let W,H,TILE,LEFT,TOP,grid=[],pieces=[],busy=false,animation=null,score=0,maxMove=0,best=+(localStorage.getItem('gravity-best')||0),history=[];
+const activeColors=()=>PALETTE.slice(0,colorCount), randomColor=()=>Math.floor(Math.random()*colorCount);
+function resize(){W=innerWidth;H=innerHeight;let d=Math.min(devicePixelRatio||1,2);canvas.width=W*d;canvas.height=H*d;ctx.setTransform(d,0,0,d,0,0);const availableWidth=W*boardWidth/100;TILE=Math.max(8,Math.floor(Math.min(availableWidth/COLS,(H-HEADER-FOOTER)/ROWS)));LEFT=Math.floor((W-COLS*TILE)/2);TOP=Math.floor(HEADER+(H-HEADER-FOOTER-ROWS*TILE)/2)}
+addEventListener('resize',resize);resize();
+function makePiece(color,row,col,fromRow=row,fromCol=col){return{color,row,col,fromRow,fromCol,scale:1}}
+const I18N={
+cs:{title:'Lukášovo spoj více',settings:'Nastavení hry',language:'Jazyk',colors:'Počet barev',cols:'Počet sloupečků',rows:'Počet řádků',width:'Šířka hracího pole',infinite:'Nekonečný režim',diagonal:'Diagonálně spojené patří k sobě',palette:'Barvy a jejich pořadí',hint:'Změna počtu barev, sloupců nebo řádků založí novou hru. Šířku pole lze měnit bez restartu. Nastavení se ukládá do tohoto prohlížeče.',score:'SKÓRE',left:'ZBÝVÁ',best:'REKORD',undo:'Zpět',newShort:'Nová',newGame:'Nová hra',infiniteInfo:'Nekonečný režim: kolečka se po tahu doplní',classicInfo:'Klasický režim: vyčisti celou desku',max:'Maximum za 1 tah: ',removedOne:'Odstraněno 1 kolečko · +1',removed:(n,p)=>`Odstraněno ${n} koleček · +${p}`,cleared:'Deska vyčištěna!',bonus:'Bonus za vyčištění desky: +500',end:s=>`Skóre: ${s} bodů. Každé kolečko lze odstranit, ale větší skupiny dávají výrazně více bodů.`,undone:'Poslední tah byl vrácen',liveBoard:'Deska se průběžně doplňuje',remaining:'Počet zbývajících koleček',openSettings:'Otevřít nastavení'},
+en:{title:"Lukáš's Connect More",settings:'Game settings',language:'Language',colors:'Number of colors',cols:'Number of columns',rows:'Number of rows',width:'Board width',infinite:'Infinite mode',diagonal:'Diagonally connected pieces belong together',palette:'Colors and their order',hint:'Changing the number of colors, columns, or rows starts a new game. Board width can be changed without restarting. Settings are saved in this browser.',score:'SCORE',left:'LEFT',best:'BEST',undo:'Undo',newShort:'New',newGame:'New game',infiniteInfo:'Infinite mode: pieces are refilled after each move',classicInfo:'Classic mode: clear the whole board',max:'Maximum in 1 move: ',removedOne:'Removed 1 piece · +1',removed:(n,p)=>`Removed ${n} pieces · +${p}`,cleared:'Board cleared!',bonus:'Board clear bonus: +500',end:s=>`Score: ${s} points. Every piece can be removed, but larger groups score significantly more points.`,undone:'The last move was undone',liveBoard:'The board is continuously refilled',remaining:'Number of pieces remaining',openSettings:'Open settings'}};
+const tr=k=>I18N[lang][k];
+function applyLanguage(){document.documentElement.lang=lang;document.title=tr('title');document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=tr(el.dataset.i18n));document.getElementById('languageSelect').value=lang;document.getElementById('settingsButton').setAttribute('aria-label',tr('openSettings'));document.getElementById('undo').title=tr('undo');document.getElementById('restart').title=tr('newGame');updateHud();}
+function init(){grid=Array.from({length:ROWS},()=>Array.from({length:COLS},()=>randomColor()));score=0;maxMove=0;history=[];syncPieces();updateHud(infinite?tr('infiniteInfo'):tr('classicInfo'));document.getElementById('overlay').classList.remove('show');busy=false;animation=null}
+function syncPieces(){pieces=[];for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(grid[r][c]!=null)pieces.push(makePiece(grid[r][c],r,c))}
+function center(r,c){return{x:LEFT+c*TILE+TILE/2,y:TOP+r*TILE+TILE/2}}
+function ease(t){return 1-Math.pow(1-t,3)}
+function circle(p,x,y,scale=1){ctx.fillStyle=PALETTE[p.color];ctx.beginPath();ctx.arc(x,y,Math.max(3,(TILE/2-3)*scale),0,Math.PI*2);ctx.fill();ctx.strokeStyle='#ffffff20';ctx.lineWidth=2;ctx.stroke()}
+function draw(){ctx.fillStyle='#05070b';ctx.fillRect(0,0,W,H);const now=performance.now();for(const p of pieces){let x,y,scale=1;if(animation?.type==='move'){let t=Math.min(1,(now-animation.start)/animation.ms),k=ease(t),a=center(p.fromRow,p.fromCol),b=center(p.row,p.col);x=a.x+(b.x-a.x)*k;y=a.y+(b.y-a.y)*k}else{x=center(p.row,p.col).x;y=center(p.row,p.col).y}if(animation?.type==='pop'&&animation.dead.has(p)){let t=Math.min(1,(now-animation.start)/POP_MS);scale=1-ease(t)}circle(p,x,y,scale)}requestAnimationFrame(draw)}
+function groupAt(r,c){let color=grid[r]?.[c];if(color==null)return[];let out=[],seen=new Set([r+','+c]),stack=[[r,c]];while(stack.length){let [y,x]=stack.pop();out.push([y,x]);for(const [dy,dx] of (diagonal?[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]:[[1,0],[-1,0],[0,1],[0,-1]])){let ny=y+dy,nx=x+dx,k=ny+','+nx;if(ny>=0&&ny<ROWS&&nx>=0&&nx<COLS&&!seen.has(k)&&grid[ny][nx]===color){seen.add(k);stack.push([ny,nx])}}}return out}
+function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+function snapshot(){return{grid:grid.map(r=>r.slice()),score,maxMove,colorCount,infinite}}
+function collapse(){let next=Array.from({length:ROWS},()=>Array(COLS).fill(null)),newPieces=[];if(infinite){for(let c=0;c<COLS;c++){let column=pieces.filter(p=>p.col===c).sort((a,b)=>b.row-a.row),targetRow=ROWS-1;for(const p of column){p.fromRow=p.row;p.fromCol=p.col;p.row=targetRow;p.col=c;next[targetRow][c]=p.color;newPieces.push(p);targetRow--}let spawn=-1;while(targetRow>=0){let p=makePiece(randomColor(),targetRow,c,spawn--,c);next[targetRow][c]=p.color;newPieces.push(p);targetRow--}}}else{let targetCol=0;for(let c=0;c<COLS;c++){let column=pieces.filter(p=>p.col===c).sort((a,b)=>b.row-a.row);if(!column.length)continue;let targetRow=ROWS-1;for(const p of column){p.fromRow=p.row;p.fromCol=p.col;p.row=targetRow;p.col=targetCol;next[targetRow][targetCol]=p.color;newPieces.push(p);targetRow--}targetCol++}}grid=next;pieces=newPieces}
+async function choose(r,c){if(busy||grid[r]?.[c]==null)return;busy=true;history.push(snapshot());undoBtn.disabled=false;let group=groupAt(r,c),deadKeys=new Set(group.map(([y,x])=>y+','+x)),dead=new Set(pieces.filter(p=>deadKeys.has(p.row+','+p.col)));animation={type:'pop',start:performance.now(),dead};await wait(POP_MS);pieces=pieces.filter(p=>!dead.has(p));for(const [y,x] of group)grid[y][x]=null;let gained=group.length*group.length;score+=gained;maxMove=Math.max(maxMove,gained);collapse();animation={type:'move',start:performance.now(),ms:Math.max(FALL_MS,SHIFT_MS)};await wait(animation.ms);animation=null;for(const p of pieces){p.fromRow=p.row;p.fromCol=p.col}updateHud(group.length===1?tr('removedOne'):tr('removed')(group.length,gained));busy=false;if(!infinite&&!pieces.length)finish()}
+function syncControls(){document.getElementById('colorsRange').value=String(colorCount);document.getElementById('colorsValue').value=String(colorCount);document.getElementById('colsRange').value=String(COLS);document.getElementById('colsValue').value=String(COLS);document.getElementById('rowsRange').value=String(ROWS);document.getElementById('rowsValue').value=String(ROWS);document.getElementById('boardWidthRange').value=String(boardWidth);document.getElementById('boardWidthValue').value=boardWidth+' %';document.getElementById('diagonalEnabled').checked=diagonal;document.getElementById('infiniteEnabled').checked=infinite}
+function updateHud(message){let count=grid.flat().filter(x=>x!=null).length;if(score>best){best=score;localStorage.setItem('gravity-best',String(best))}scoreEl.textContent=score;leftEl.textContent=count;bestEl.textContent=best;maxEl.textContent=tr('max')+maxMove;if(message)lastEl.textContent=message;document.querySelector('.label + #left')?.setAttribute('title',infinite?tr('liveBoard'):tr('remaining'))}
+function finish(){let bonus=500;score+=bonus;updateHud(tr('bonus'));document.getElementById('endTitle').textContent=tr('cleared');document.getElementById('endText').textContent=tr('end')(score);document.getElementById('overlay').classList.add('show')}
+function undo(){if(busy||!history.length)return;let s=history.pop();grid=s.grid.map(r=>r.slice());score=s.score;maxMove=s.maxMove;colorCount=s.colorCount;infinite=s.infinite;syncControls();syncPieces();animation=null;undoBtn.disabled=!history.length;updateHud(tr('undone'))}
+function position(e){let rect=canvas.getBoundingClientRect();return{x:e.clientX-rect.left,y:e.clientY-rect.top}}
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();if(busy)return;let p=position(e),c=Math.floor((p.x-LEFT)/TILE),r=Math.floor((p.y-TOP)/TILE);if(r>=0&&r<ROWS&&c>=0&&c<COLS)choose(r,c)});
+document.getElementById('undo').onclick=undo;document.getElementById('restart').onclick=init;document.getElementById('again').onclick=init;
+
+const settingsButton=document.getElementById('settingsButton'),settingsPanel=document.getElementById('settingsPanel'),paletteEditor=document.getElementById('paletteEditor');
+function normalizeHex(v){v=v.trim().toUpperCase();if(!v.startsWith('#'))v='#'+v;return /^#[0-9A-F]{6}$/.test(v)?v:null}
+function savePalette(){localStorage.setItem('gravity-palette',JSON.stringify(PALETTE))}
+function renderPaletteEditor(){paletteEditor.innerHTML='';PALETTE.slice(0,colorCount).forEach((color,index)=>{const row=document.createElement('div');row.className='colorRow';row.innerHTML=`<span class="colorIndex">${index+1}</span><input class="colorPicker" type="color" value="${color}"><input class="colorHex" value="${color}" maxlength="7"><button class="moveColor" data-dir="-1" ${index===0?'disabled':''}>↑</button><button class="moveColor" data-dir="1" ${index===colorCount-1?'disabled':''}>↓</button>`;const picker=row.querySelector('.colorPicker'),hex=row.querySelector('.colorHex');picker.oninput=()=>{PALETTE[index]=picker.value.toUpperCase();hex.value=PALETTE[index];savePalette();init()};hex.onchange=()=>{const v=normalizeHex(hex.value);if(v){PALETTE[index]=v;picker.value=v;hex.value=v;savePalette();init()}else hex.value=PALETTE[index]};row.querySelectorAll('.moveColor').forEach(b=>b.onclick=()=>{const other=index+Number(b.dataset.dir);[PALETTE[index],PALETTE[other]]=[PALETTE[other],PALETTE[index]];savePalette();renderPaletteEditor();init()});paletteEditor.appendChild(row)})}
+function applyBoardSettings(){colorCount=+document.getElementById('colorsRange').value;COLS=+document.getElementById('colsRange').value;ROWS=+document.getElementById('rowsRange').value;localStorage.setItem('gravity-colors',colorCount);localStorage.setItem('gravity-cols',COLS);localStorage.setItem('gravity-rows',ROWS);syncControls();renderPaletteEditor();resize();init()}
+document.getElementById('languageSelect').addEventListener('change',e=>{lang=e.target.value;localStorage.setItem('gravity-language',lang);applyLanguage();lastEl.textContent=infinite?tr('infiniteInfo'):tr('classicInfo')});
+['colorsRange','colsRange','rowsRange'].forEach(id=>document.getElementById(id).addEventListener('input',applyBoardSettings));
+document.getElementById('boardWidthRange').addEventListener('input',e=>{boardWidth=+e.target.value;localStorage.setItem('gravity-board-width',boardWidth);syncControls();resize()});
+document.getElementById('infiniteEnabled').addEventListener('change',e=>{infinite=e.target.checked;localStorage.setItem('gravity-infinite',infinite?'1':'0');syncControls();init()});
+document.getElementById('diagonalEnabled').addEventListener('change',e=>{diagonal=e.target.checked;localStorage.setItem('gravity-diagonal',diagonal?'1':'0');syncControls()});
+settingsButton.onclick=e=>{e.stopPropagation();const open=settingsPanel.classList.toggle('open');settingsButton.setAttribute('aria-expanded',String(open))};settingsPanel.addEventListener('pointerdown',e=>e.stopPropagation());document.addEventListener('pointerdown',e=>{if(!document.getElementById('settingsWrap').contains(e.target)){settingsPanel.classList.remove('open');settingsButton.setAttribute('aria-expanded','false')}});
+syncControls();renderPaletteEditor();applyLanguage();init();draw();
+})();
+</script>
+</body>
+</html>

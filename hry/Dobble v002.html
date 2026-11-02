@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dobble pro jednoho v002</title>
+<style>
+:root{--bg1:#eef7ff;--bg2:#fef5e7;--ink:#17324d;--accent:#ef476f;--ok:#159957;--bad:#d62828;--card-size:clamp(250px,38vw,420px);--symbol-size:54px}
+*{box-sizing:border-box} body{margin:0;min-height:100vh;font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--ink);background:linear-gradient(135deg,var(--bg1),var(--bg2));overflow-x:hidden}
+button,input,select{font:inherit}.app{width:min(1180px,100%);margin:auto;padding:18px}.top{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}.title{margin:0;font-size:clamp(24px,4vw,40px)}.stats{display:flex;gap:10px;flex-wrap:wrap}.pill{background:#fff9;padding:9px 13px;border-radius:999px;box-shadow:0 5px 16px #17324d18;font-weight:700}.game{display:grid;grid-template-columns:1fr 1fr;gap:clamp(4px,1.2vw,14px);align-items:center;justify-items:center;margin:22px auto;width:fit-content;max-width:100%}.card{width:var(--card-size);height:var(--card-size);max-width:44vw;max-height:44vw;min-width:240px;min-height:240px;border-radius:50%;background:white;border:10px solid #fff;box-shadow:0 14px 40px #17324d30,inset 0 0 0 5px #17324d14;position:relative;transition:transform .22s,opacity .18s}.card.changing{transform:scale(.92) rotate(3deg);opacity:.28}.symbol{position:absolute;transform:translate(-50%,-50%) rotate(var(--r));border:0;background:transparent;cursor:pointer;font-size:var(--s);line-height:1;padding:6px;border-radius:18px;filter:drop-shadow(0 3px 2px #0002);transition:transform .12s,background .12s}.symbol:hover,.symbol:focus-visible{background:#dff4ff;transform:translate(-50%,-50%) rotate(var(--r)) scale(1.16);outline:3px solid #2997ff}.symbol:active{transform:translate(-50%,-50%) rotate(var(--r)) scale(.9)}.message{text-align:center;min-height:35px;font-size:20px;font-weight:800}.controls{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}.primary,.secondary{border:0;border-radius:12px;padding:11px 18px;font-weight:800;cursor:pointer}.primary{background:var(--accent);color:white}.secondary{background:white;color:var(--ink);box-shadow:0 4px 14px #17324d18}.settings{margin:20px auto 0;background:#ffffffcf;border-radius:20px;padding:16px;box-shadow:0 8px 28px #17324d17}.settings summary{font-weight:900;cursor:pointer}.grid{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:12px;margin-top:14px}.field{display:flex;flex-direction:column;gap:5px;font-weight:700}.field input,.field select{width:100%;padding:9px;border:1px solid #adc3d7;border-radius:9px;background:white}.history{margin-top:15px;display:flex;gap:7px;flex-wrap:wrap}.leaderboard{margin-top:16px;background:#ffffffd9;border-radius:20px;padding:16px;box-shadow:0 8px 28px #17324d17}.leaderboard h2{margin:0 0 10px}.leaderboard table{width:100%;border-collapse:collapse}.leaderboard th,.leaderboard td{padding:8px 10px;text-align:left;border-bottom:1px solid #dce7f0;font-variant-numeric:tabular-nums}.leaderboard th{font-size:13px;opacity:.75}.leaderboard-empty{opacity:.7;padding:8px 0}.last-result{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.last-result .pill{background:#fff}.time{padding:6px 9px;border-radius:9px;background:#edf4fa;font-variant-numeric:tabular-nums}.modal{position:fixed;inset:0;background:#13293dcc;display:none;place-items:center;padding:18px;z-index:10}.modal.show{display:grid}.panel{width:min(520px,100%);background:white;border-radius:24px;padding:28px;text-align:center;box-shadow:0 18px 55px #0006}.result{font-size:clamp(42px,8vw,72px);font-weight:900;color:var(--accent);margin:12px}.small{opacity:.75}
+@media(max-width:720px){.app{padding:10px}.game{gap:8px;margin:15px 0}.card{min-width:0;min-height:0;width:46vw;height:46vw;border-width:6px}.grid{grid-template-columns:1fr 1fr}.symbol{padding:3px}.settings{margin-top:12px}.stats{gap:5px}.pill{padding:7px 9px;font-size:13px}}
+@media(max-width:390px){.grid{grid-template-columns:1fr}.title{font-size:23px}}
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <h1 class="title">🎯 Dobble pro jednoho</h1>
+    <div class="stats" aria-live="polite">
+      <span class="pill">Kolo: <b id="round">0</b>/<b id="roundsOut">10</b></span>
+      <span class="pill">Čas: <b id="timer">0,00</b> s</span>
+      <span class="pill">Průměr: <b id="avg">–</b></span>
+    </div>
+  </header>
+
+  <section class="game" aria-label="Dvě hrací karty">
+    <div class="card" id="card0" aria-label="Levá karta"></div>
+    <div class="card" id="card1" aria-label="Pravá karta"></div>
+  </section>
+  <div class="message" id="message">Najdi stejný symbol na obou kartách.</div>
+  <div class="controls">
+    <button class="primary" id="startBtn">Nová hra</button>
+    <button class="secondary" id="pauseBtn">Pozastavit</button>
+  </div>
+  <details class="settings">
+    <summary>Nastavení hry</summary>
+    <div class="grid">
+      <label class="field">Počet kol<input id="rounds" type="number" min="1" max="100" value="10"></label>
+      <label class="field">Symbolů na kartě<input id="count" type="number" min="3" max="12" value="7"></label>
+      <label class="field">Velikost symbolů<input id="size" type="range" min="30" max="85" value="54"></label>
+      <label class="field">Změna karty<select id="changeMode"><option value="alternate">Střídavě</option><option value="random">Náhodně</option><option value="left">Vždy levá</option><option value="right">Vždy pravá</option></select></label>
+      <label class="field">Chybný klik<select id="penalty"><option value="0">Bez penalizace</option><option value="500">+ 0,5 s</option><option value="1000">+ 1 s</option><option value="2000">+ 2 s</option></select></label>
+      <label class="field">Barevné symboly<select id="colorful"><option value="yes">Ano</option><option value="no">Ne</option></select></label>
+      <label class="field">Míchání velikostí<select id="varSize"><option value="yes">Ano</option><option value="no">Ne</option></select></label>
+      <label class="field">Odpočet před startem<select id="countdown"><option value="0">Ne</option><option value="3">3 sekundy</option><option value="5">5 sekund</option></select></label>
+      <label class="field">Leaderboard<select id="leaderboardMode"><option value="names">Se jmény</option><option value="anonymous">Bez jmen</option><option value="off">Vypnutý</option></select></label>
+      <label class="field">Jméno hráče<input id="playerName" type="text" maxlength="24" value="Hráč" autocomplete="nickname"></label>
+    </div>
+  </details>
+  <div class="history" id="history" aria-label="Časy jednotlivých kol"></div>
+  <div class="last-result" id="lastResult" hidden><span class="pill">Poslední průměr: <b id="lastAvg">–</b></span><span class="pill">Nejlepší klik: <b id="lastBest">–</b></span></div>
+  <section class="leaderboard" id="leaderboard"><h2>Top 10</h2><div id="leaderboardContent"></div></section>
+</main>
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+  <div class="panel"><h2 id="resultTitle">Hotovo!</h2><div class="small">Průměrný reakční čas</div><div class="result" id="finalAvg"></div><div id="finalInfo"></div><br><button class="primary" id="againBtn">Hrát znovu</button></div>
+</div>
+<script>
+'use strict';
+const SYMBOLS=['★','●','▲','■','♥','☂','☀','☁','⚡','♫','⚙','✈','⌂','☕','✿','◆','✚','☯','⚓','☘','♞','☎','✂','⌛','☃','☾','♣','♛','✎','☮','◎','⬟','♬','⚜','✖','♨','⚛','☸','⚔','⚖','❀','♠','❄','➜','⚑','◉','⬢','✤','◬','♜','☏','☢','☣','☠','♩','♧','❣','✉','✓','∞','§','¶','¤','Ж','Ω','λ','@','#','?','!'];
+const COLORS=['#ef476f','#118ab2','#06a77d','#ff9f1c','#6a4c93','#e63946','#3a86ff','#2a9d8f'];
+const $=id=>document.getElementById(id); let cards=[[],[]],times=[],round=0,startedAt=0,running=false,paused=false,pauseAt=0,penaltyMs=0,raf=0,nextChange=1,layoutSeed=0;
+function config(){return{rounds:Math.max(1,Math.min(100,+$('rounds').value||10)),count:Math.max(3,Math.min(12,+$('count').value||7)),size:+$('size').value,mode:$('changeMode').value,penalty:+$('penalty').value,colorful:$('colorful').value==='yes',varSize:$('varSize').value==='yes',countdown:+$('countdown').value,leaderboardMode:$('leaderboardMode').value,playerName:$('playerName').value.trim()||'Hráč'}}
+function shuffled(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function freshCard(shared,avoid,cfg){const pool=shuffled(SYMBOLS.filter(s=>s===shared||!avoid.has(s)));return [shared,...pool.filter(s=>s!==shared).slice(0,cfg.count-1)]}
+function initialCards(cfg){const shared=SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)];cards[0]=freshCard(shared,new Set(),cfg);cards[1]=freshCard(shared,new Set(cards[0].filter(x=>x!==shared)),cfg);common()}
+function positions(n,seed){const out=[];const golden=2.3999632297;for(let i=0;i<n;i++){const ring=i===0?0:Math.ceil(i/6);const radius=i===0?0:Math.min(36,16+ring*12);const angle=i*golden+seed;out.push([50+radius*Math.cos(angle),50+radius*Math.sin(angle)])}return shuffled(out)}
+function renderCard(index,cfg){const el=$('card'+index);el.innerHTML='';const pos=positions(cards[index].length,layoutSeed+index);shuffled(cards[index]).forEach((sym,i)=>{const b=document.createElement('button');b.className='symbol';b.textContent=sym;b.dataset.sym=sym;b.setAttribute('aria-label','Symbol '+sym);b.style.left=pos[i][0]+'%';b.style.top=pos[i][1]+'%';b.style.setProperty('--r','0deg');const mult=cfg.varSize?.72+Math.random()*.55:1;b.style.setProperty('--s',(cfg.size*mult)+'px');b.style.color=cfg.colorful?COLORS[Math.floor(Math.random()*COLORS.length)]:'#17324d';b.addEventListener('click',()=>choose(index,sym));el.appendChild(b)})}
+function render(){const cfg=config();document.documentElement.style.setProperty('--symbol-size',cfg.size+'px');renderCard(0,cfg);renderCard(1,cfg)}
+function commonSymbols(){return [...new Set(cards[0])].filter(s=>cards[1].includes(s))}
+function common(){const matches=commonSymbols();if(matches.length!==1)throw new Error('Neplatná dvojice karet: '+matches.length+' společných symbolů');return matches[0]}
+function choose(index,sym){if(!running||paused)return;if(sym!==common()){penaltyMs+=config().penalty;$('message').textContent='To není společný symbol.';$('message').style.color='var(--bad)';return}const elapsed=performance.now()-startedAt+penaltyMs;times.push(elapsed);round++;updateStats();if(round>=config().rounds){finish();return}$('message').textContent='Správně!';$('message').style.color='var(--ok)';changeOneCard(config());startedAt=performance.now();penaltyMs=0}
+function changeOneCard(cfg){let idx=cfg.mode==='random'?Math.floor(Math.random()*2):cfg.mode==='left'?0:cfg.mode==='right'?1:nextChange;nextChange=1-idx;const fixed=1-idx;const newShared=cards[fixed][Math.floor(Math.random()*cards[fixed].length)];cards[idx]=freshCard(newShared,new Set(cards[fixed].filter(x=>x!==newShared)),cfg);common();layoutSeed+=.73;const el=$('card'+idx);el.classList.add('changing');setTimeout(()=>{renderCard(idx,cfg);el.classList.remove('changing');$('message').textContent='Najdi stejný symbol.';$('message').style.color=''},150)}
+function updateStats(){const cfg=config();$('round').textContent=round;$('roundsOut').textContent=cfg.rounds;$('avg').textContent=times.length?format(times.reduce((a,b)=>a+b,0)/times.length)+' s':'–';$('history').innerHTML=times.map((t,i)=>`<span class="time">${i+1}. ${format(t)} s</span>`).join('')}
+function loadBoard(){try{return JSON.parse(localStorage.getItem('dobbleLeaderboardV2')||'[]')}catch(e){return []}}
+function saveBoard(board){try{localStorage.setItem('dobbleLeaderboardV2',JSON.stringify(board))}catch(e){}}
+function renderLeaderboard(){const cfg=config(),box=$('leaderboard'),content=$('leaderboardContent');box.hidden=cfg.leaderboardMode==='off';if(box.hidden)return;const board=loadBoard().slice(0,10);if(!board.length){content.innerHTML='<div class="leaderboard-empty">Zatím bez výsledků.</div>';return}const showNames=cfg.leaderboardMode==='names';content.innerHTML=`<table><thead><tr><th>#</th>${showNames?'<th>Jméno</th>':''}<th>Průměr</th><th>Min. čas</th><th>Kol</th></tr></thead><tbody>${board.map((r,i)=>`<tr><td>${i+1}.</td>${showNames?`<td>${escapeHtml(r.name)}</td>`:''}<td>${format(r.avg)} s</td><td>${format(r.best)} s</td><td>${r.rounds}</td></tr>`).join('')}</tbody></table>`}
+function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function addResult(avg,best){const cfg=config();if(cfg.leaderboardMode==='off')return;const board=loadBoard();board.push({name:cfg.playerName,avg,best,rounds:times.length,at:Date.now()});board.sort((a,b)=>a.avg-b.avg||a.best-b.best);saveBoard(board.slice(0,10));renderLeaderboard()}
+function format(ms){return(ms/1000).toFixed(2).replace('.',',')}
+function tick(){if(running&&!paused){$('timer').textContent=format(performance.now()-startedAt+penaltyMs);raf=requestAnimationFrame(tick)}}
+async function start(){cancelAnimationFrame(raf);const cfg=config();times=[];round=0;penaltyMs=0;paused=false;running=false;nextChange=1;$('modal').classList.remove('show');$('pauseBtn').textContent='Pozastavit';initialCards(cfg);render();updateStats();if(cfg.countdown){for(let n=cfg.countdown;n>0;n--){$('message').textContent='Start za '+n+'…';await new Promise(r=>setTimeout(r,1000))}}$('message').textContent='Najdi stejný symbol.';$('message').style.color='';running=true;startedAt=performance.now();tick()}
+function finish(){running=false;cancelAnimationFrame(raf);const avg=times.reduce((a,b)=>a+b,0)/times.length;const best=Math.min(...times);$('finalAvg').textContent=format(avg)+' s';$('finalInfo').textContent=`Nejlepší čas: ${format(best)} s | Kol: ${times.length}`;$('lastAvg').textContent=format(avg)+' s';$('lastBest').textContent=format(best)+' s';$('lastResult').hidden=false;addResult(avg,best);$('modal').classList.add('show')}
+function togglePause(){if(!running)return;if(!paused){paused=true;pauseAt=performance.now();cancelAnimationFrame(raf);$('pauseBtn').textContent='Pokračovat';$('message').textContent='Pauza'}else{startedAt+=performance.now()-pauseAt;paused=false;$('pauseBtn').textContent='Pozastavit';$('message').textContent='Najdi stejný symbol.';tick()}}
+$('startBtn').addEventListener('click',start);$('againBtn').addEventListener('click',start);$('pauseBtn').addEventListener('click',togglePause);$('size').addEventListener('input',()=>render());$('leaderboardMode').addEventListener('change',renderLeaderboard);['rounds','count'].forEach(id=>$(id).addEventListener('change',()=>{if(!running){initialCards(config());render();updateStats()}}));
+initialCards(config());render();updateStats();renderLeaderboard();
+</script>
+</body>
+</html>
