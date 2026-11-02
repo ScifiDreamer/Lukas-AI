@@ -1,0 +1,17 @@
+<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Tetris</title>
+<style>body{margin:0;background:#0b1020;color:#fff;font:16px system-ui;display:grid;place-items:center;min-height:100vh}main{text-align:center}canvas{background:#050814;border:2px solid #53617d;max-height:78vh;max-width:95vw}button{padding:9px 16px;margin:5px;font-weight:700}.row{margin:8px}</style>
+<main><h1>Tetris</h1><div>Skóre: <b id=s>0</b> | Level: <b id=l>1</b></div><canvas id=c width=300 height=600></canvas><div class=row><button onclick='reset()'>Nová hra</button><button onclick='paused=!paused'>Pauza</button></div><small>← → pohyb · ↑ otočit · ↓ dolů · mezerník = pád</small></main>
+<script>
+const C=document.getElementById('c'),x=C.getContext('2d'),W=10,H=20,Z=30,colors=['','#22d3ee','#facc15','#a78bfa','#4ade80','#f87171','#60a5fa','#fb923c'];let b,p,score,last,paused=false,over=false;
+const S=[[[1,1,1,1]],[[2,2],[2,2]],[[0,3,0],[3,3,3]],[[0,4,4],[4,4,0]],[[5,5,0],[0,5,5]],[[6,0,0],[6,6,6]],[[0,0,7],[7,7,7]]];
+function piece(){let n=Math.random()*7|0;return {m:S[n].map(r=>r.slice()),x:3,y:0}}
+function hit(q=p){for(let y=0;y<q.m.length;y++)for(let z=0;z<q.m[y].length;z++)if(q.m[y][z]&&(q.y+y>=H||q.x+z<0||q.x+z>=W||q.y+y>=0&&b[q.y+y][q.x+z]))return true;return false}
+function merge(){p.m.forEach((r,y)=>r.forEach((v,z)=>{if(v)b[p.y+y][p.x+z]=v}));let n=0;for(let y=H-1;y>=0;y--)if(b[y].every(Boolean)){b.splice(y,1);b.unshift(Array(W).fill(0));n++;y++}score += [0,100,300,500,800][n]*(1+(score/1500|0));document.getElementById('s').textContent=score;document.getElementById('l').textContent=1+(score/1500|0);p=piece();if(hit())over=true}
+function drop(){p.y++;if(hit()){p.y--;merge()}}
+function rot(){let m=p.m[0].map((_,i)=>p.m.map(r=>r[i]).reverse()),o=p.m;p.m=m;if(hit())p.m=o}
+function draw(){x.fillStyle='#050814';x.fillRect(0,0,C.width,C.height);[b,p].forEach((a,k)=>{if(k===0)a.forEach((r,y)=>r.forEach((v,z)=>cell(z,y,v)));else a.m.forEach((r,y)=>r.forEach((v,z)=>cell(a.x+z,a.y+y,v)))});x.strokeStyle='#17213a';for(let i=0;i<=W;i++){x.beginPath();x.moveTo(i*Z,0);x.lineTo(i*Z,H*Z);x.stroke()}if(over){x.fillStyle='#000a';x.fillRect(0,260,300,80);x.fillStyle='#fff';x.font='bold 27px system-ui';x.textAlign='center';x.fillText('KONEC HRY',150,310)}}
+function cell(a,y,v){if(!v)return;x.fillStyle=colors[v];x.fillRect(a*Z+1,y*Z+1,Z-2,Z-2)}
+function loop(t=0){if(!paused&&!over&&t-last>Math.max(90,650-(score/1500|0)*55)){drop();last=t}draw();requestAnimationFrame(loop)}
+function reset(){b=Array.from({length:H},()=>Array(W).fill(0));p=piece();score=0;over=false;paused=false;last=0;s.textContent=0;l.textContent=1}
+onkeydown=e=>{if(over)return;let k=e.key;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(k))e.preventDefault();if(k==='ArrowLeft'){p.x--;if(hit())p.x++}if(k==='ArrowRight'){p.x++;if(hit())p.x--}if(k==='ArrowUp')rot();if(k==='ArrowDown')drop();if(k===' '){while(!hit()){p.y++}p.y--;merge()}};reset();loop();
+</script>

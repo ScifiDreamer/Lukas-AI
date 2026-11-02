@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Tetris</title>
+<style>
+:root{color-scheme:dark;--bg:#0a0f1f;--panel:#121a31;--line:#29365d;--text:#eef3ff;--accent:#5ee7ff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at top,#18254a,var(--bg) 58%);font-family:system-ui,sans-serif;color:var(--text);touch-action:manipulation;overflow:auto}
+.game{display:grid;grid-template-columns:minmax(180px,300px) 150px;gap:16px;padding:16px;align-items:start}.board-wrap{position:relative;background:#050814;border:3px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 18px 48px #0008}canvas{display:block;width:100%;height:auto;image-rendering:pixelated}.side{display:grid;gap:12px}.card{background:#121a31dd;border:1px solid var(--line);border-radius:12px;padding:12px}.label{font-size:12px;color:#a9b8db;text-transform:uppercase;letter-spacing:.1em}.value{font-size:25px;font-weight:800}.next{width:100%;background:#080d1d;border-radius:8px;margin-top:8px}.buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}button{border:0;border-radius:9px;padding:11px 8px;background:#26375f;color:white;font-weight:750;cursor:pointer}button:hover{background:#334a7e}button:active{transform:translateY(1px)}.primary{background:#087f9b}.overlay{position:absolute;inset:0;display:none;place-items:center;text-align:center;background:#050814d9;padding:20px}.overlay.show{display:grid}.overlay h2{font-size:28px;margin:0 0 8px}.help{font-size:12px;line-height:1.55;color:#b9c6e3}.mobile{display:none;grid-template-columns:repeat(5,1fr);gap:7px;padding:0 16px 16px;width:min(100%,500px)}.mobile button{font-size:20px;min-height:48px}
+@media(max-width:600px){body{place-items:start center}.game{grid-template-columns:minmax(170px,1fr) 105px;gap:8px;padding:8px;width:min(100%,430px)}.side{gap:7px}.card{padding:8px}.value{font-size:19px}.help{display:none}.buttons{grid-template-columns:1fr}.mobile{display:grid}.next{max-height:80px}.label{font-size:10px}}
+</style></head>
+<body>
+<main><section class="game">
+<div class="board-wrap"><canvas id="board" width="300" height="600" aria-label="Herní plocha Tetris"></canvas><div id="overlay" class="overlay"><div><h2 id="overTitle">Tetris</h2><p id="overText">Stiskni Spustit</p><button id="overlayBtn" class="primary">Spustit</button></div></div></div>
+<aside class="side">
+<div class="card"><div class="label">Skóre</div><div class="value" id="score">0</div><div class="label">Rekord</div><div class="value" id="best">0</div></div>
+<div class="card"><div class="label">Úroveň <b id="level">1</b></div><div class="label">Řádky <b id="lines">0</b></div></div>
+<div class="card"><div class="label">Další</div><canvas id="next" class="next" width="120" height="90"></canvas></div>
+<div class="buttons"><button id="new" class="primary">Nová hra</button><button id="pause">Pauza</button></div>
+<div class="card help">← → pohyb<br>↑ otočit<br>↓ dolů<br>Mezerník pád<br>P pauza</div>
+</aside></section>
+<div class="mobile"><button data-a="left">◀</button><button data-a="rotate">↻</button><button data-a="right">▶</button><button data-a="down">▼</button><button data-a="drop">⤓</button></div></main>
+<script>
+(()=>{'use strict';const C=10,R=20,S=30,cv=document.querySelector('#board'),ctx=cv.getContext('2d'),nc=document.querySelector('#next'),nx=nc.getContext('2d');const colors=['','#24d6ff','#ffd23f','#9d6cff','#47e576','#ff4e68','#fa8f32','#448aff'];const shapes=[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[0,1,1],[1,1,0]],[[1,1,0],[0,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]]];let board,piece,next,score,lines,level,best=+localStorage.tetrisBest||0,last=0,acc=0,running=false,paused=false,raf;
+const $=s=>document.querySelector(s);$('#best').textContent=best;
+function bagPiece(){let i=Math.floor(Math.random()*shapes.length);return{m:shapes[i].map(r=>r.slice()),x:3,y:-1,c:i+1}}
+function reset(){board=Array.from({length:R},()=>Array(C).fill(0));score=lines=0;level=1;piece=bagPiece();next=bagPiece();running=true;paused=false;last=performance.now();acc=0;hide();update();draw();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop)}
+function collide(p=piece){for(let y=0;y<p.m.length;y++)for(let x=0;x<p.m[y].length;x++)if(p.m[y][x]){let X=p.x+x,Y=p.y+y;if(X<0||X>=C||Y>=R||(Y>=0&&board[Y][X]))return true}return false}
+function merge(){piece.m.forEach((r,y)=>r.forEach((v,x)=>{if(v&&piece.y+y>=0)board[piece.y+y][piece.x+x]=piece.c}));let n=0;for(let y=R-1;y>=0;y--)if(board[y].every(Boolean)){board.splice(y,1);board.unshift(Array(C).fill(0));n++;y++}if(n){lines+=n;score+=[0,100,300,500,800][n]*level;level=1+Math.floor(lines/10)}piece=next;piece.x=3;piece.y=-1;next=bagPiece();if(collide()){running=false;best=Math.max(best,score);localStorage.tetrisBest=best;show('Konec hry','Skóre: '+score,'Hrát znovu')}update()}
+function move(dx,dy){if(!running||paused)return;piece.x+=dx;piece.y+=dy;if(collide()){piece.x-=dx;piece.y-=dy;if(dy>0)merge()}draw()}
+function rotate(){if(!running||paused)return;let old=piece.m,ox=piece.x;piece.m=old[0].map((_,i)=>old.map(r=>r[i]).reverse());for(let k of [0,-1,1,-2,2]){piece.x=ox+k;if(!collide()){draw();return}}piece.x=ox;piece.m=old}
+function drop(){if(!running||paused)return;let d=0;while(!collide()){piece.y++;d++}piece.y--;score+=Math.max(0,(d-1)*2);merge();update();draw()}
+function ghostY(){let y=piece.y;while(!collide({...piece,y:y+1}))y++;return y}
+function cell(g,x,y,c,a=1){g.globalAlpha=a;g.fillStyle=colors[c];g.fillRect(x*S+1,y*S+1,S-2,S-2);g.fillStyle='#fff4';g.fillRect(x*S+3,y*S+3,S-6,3);g.globalAlpha=1}
+function draw(){ctx.fillStyle='#050814';ctx.fillRect(0,0,cv.width,cv.height);ctx.strokeStyle='#111a31';for(let x=0;x<=C;x++){ctx.beginPath();ctx.moveTo(x*S,0);ctx.lineTo(x*S,R*S);ctx.stroke()}for(let y=0;y<=R;y++){ctx.beginPath();ctx.moveTo(0,y*S);ctx.lineTo(C*S,y*S);ctx.stroke()}board.forEach((r,y)=>r.forEach((v,x)=>v&&cell(ctx,x,y,v)));if(piece){let gy=ghostY();piece.m.forEach((r,y)=>r.forEach((v,x)=>v&&gy+y>=0&&cell(ctx,piece.x+x,gy+y,piece.c,.18)));piece.m.forEach((r,y)=>r.forEach((v,x)=>v&&piece.y+y>=0&&cell(ctx,piece.x+x,piece.y+y,piece.c)))}drawNext()}
+function drawNext(){nx.clearRect(0,0,nc.width,nc.height);if(!next)return;let bs=22,w=next.m[0].length*bs,h=next.m.length*bs;next.m.forEach((r,y)=>r.forEach((v,x)=>{if(v){nx.fillStyle=colors[next.c];nx.fillRect((120-w)/2+x*bs+1,(90-h)/2+y*bs+1,bs-2,bs-2)}}))}
+function update(){$('#score').textContent=score;$('#lines').textContent=lines;$('#level').textContent=level;$('#best').textContent=Math.max(best,score)}
+function loop(t){if(running&&!paused){acc+=t-last;let speed=Math.max(90,800-(level-1)*65);if(acc>=speed){move(0,1);acc=0}}last=t;if(running)raf=requestAnimationFrame(loop)}
+function show(a,b,c){$('#overTitle').textContent=a;$('#overText').textContent=b;$('#overlayBtn').textContent=c;$('#overlay').classList.add('show')}function hide(){$('#overlay').classList.remove('show')}
+function togglePause(){if(!running)return;paused=!paused;$('#pause').textContent=paused?'Pokračovat':'Pauza';if(paused)show('Pauza','Hra je pozastavena','Pokračovat');else{hide();last=performance.now();raf=requestAnimationFrame(loop)}}
+function action(a){({left:()=>move(-1,0),right:()=>move(1,0),down:()=>move(0,1),rotate,drop}[a]||(()=>{}))()}
+addEventListener('keydown',e=>{let m={ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down',ArrowUp:'rotate',' ':'drop'};if(m[e.key]){e.preventDefault();action(m[e.key])}else if(e.key.toLowerCase()==='p')togglePause()});document.querySelectorAll('[data-a]').forEach(b=>{let timer;b.addEventListener('pointerdown',e=>{e.preventDefault();action(b.dataset.a);if(['left','right','down'].includes(b.dataset.a))timer=setInterval(()=>action(b.dataset.a),110)});['pointerup','pointercancel','pointerleave'].forEach(x=>b.addEventListener(x,()=>clearInterval(timer)))});$('#new').onclick=reset;$('#pause').onclick=togglePause;$('#overlayBtn').onclick=()=>paused?togglePause():reset();show('Tetris','Šipky nebo tlačítka dole','Spustit');draw();
+})();
+</script></body></html>
