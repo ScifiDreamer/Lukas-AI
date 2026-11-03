@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#eee">
+<title>Kalendář v55</title>
+<style>
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#eee}iframe{display:block;width:100%;height:100%;border:0}
+</style>
+</head>
+<body>
+<iframe id="calendar" title="Kalendář" src="./Kalend%C3%A1%C5%99%20v54.html"></iframe>
+<script>
+(()=>{'use strict';const frame=document.getElementById('calendar');frame.addEventListener('load',()=>{
+  let doc;try{doc=frame.contentDocument;if(!doc||!doc.body)throw new Error('Kalendář se nenačetl.')}catch(e){return}
+  const stage=doc.querySelector('.stage'),wrap=doc.querySelector('.wrap');if(!stage||!wrap)return;
+  // Use Pointer Events so Android Chrome's browser-level pinch gesture does not
+  // swallow the gesture before the calendar can scale.
+  stage.style.touchAction='none';wrap.style.transformOrigin='center center';
+  let points=new Map(),pinch=null,scale=1;
+  const distance=()=>{const p=[...points.values()];return Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y)};
+  const start=e=>{if(e.pointerType!=='touch')return;points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size===2){e.preventDefault();e.stopImmediatePropagation();const d=distance();pinch={distance:d||1,scale};}};
+  const move=e=>{if(!points.has(e.pointerId))return;points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(!pinch||points.size<2)return;e.preventDefault();e.stopImmediatePropagation();scale=Math.max(.6,Math.min(4,pinch.scale*distance()/pinch.distance));wrap.style.setProperty('scale',String(scale));};
+  const end=e=>{if(points.has(e.pointerId)){if(pinch){e.preventDefault();e.stopImmediatePropagation()}points.delete(e.pointerId);if(points.size<2)pinch=null;}};
+  doc.addEventListener('pointerdown',start,true);doc.addEventListener('pointermove',move,{capture:true,passive:false});doc.addEventListener('pointerup',end,true);doc.addEventListener('pointercancel',end,true);
+});})();
+</script>
+</body>
+</html>
