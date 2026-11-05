@@ -26,7 +26,7 @@
     footer{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;color:var(--muted)}.pager{display:flex;align-items:center;gap:10px}.page-btn{padding:8px 14px}.page-btn:disabled{opacity:.35;cursor:not-allowed}.page-info{text-align:center;min-width:100px}.hint{text-align:right;font-size:14px}
     @media(prefers-color-scheme:light){:root{--bg:#f3f6fb;--panel:#fff;--card:#fff;--text:#172238;--muted:#526176;--line:#cbd5e1;--accent:#2563eb;--accent2:#067a5b;--danger:#b42318;--shadow:0 8px 22px #1e293b12}body{background:radial-gradient(circle at 10% 0,#e2edff 0,transparent 38%),var(--bg)}.github,.card{background:var(--card)}}
     @media(max-width:980px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.controls{grid-template-columns:1fr 1fr}.status{display:none}.tabs{grid-column:1/-1}.tab{flex:1}.hint{display:none}}
-    @media(max-width:650px){body{font-size:16px}.app{padding:10px;gap:8px}.github{display:none}.controls{grid-template-columns:1fr}.tabs{grid-column:auto}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.card{min-height:58px;padding:10px}footer{grid-template-columns:1fr}.pager{justify-content:center}footer>span{display:none}}
+    @media(max-width:650px){body{font-size:16px}.app{padding:10px;gap:8px}header{align-items:center;gap:8px}.brand{min-width:0}.brand h1{font-size:clamp(24px,8vw,32px);white-space:nowrap}.brand p{display:none}.github{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;padding:8px 10px;font-size:13px;line-height:1.15;text-align:center}.controls{grid-template-columns:1fr}.tabs{grid-column:auto}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.card{min-height:58px;padding:10px}footer{grid-template-columns:1fr}.pager{justify-content:center}footer>span{display:none}}
     @media(max-height:720px){.brand p{display:none}.app{padding:10px;gap:8px}}
   </style>
 </head>
@@ -67,7 +67,16 @@
   function category(path){const first=path.split('/')[0].toLocaleLowerCase('cs');if(first==='hry')return'hry';if(first==='utilitky'||first==='utilityky'||first==='utility')return'utilitky';return first}
   function label(path){const file=path.split('/').pop().replace(/\.html?$/i,'');return file.replace(/[-_]+/g,' ').replace(/\s+v\d+(?:[.\s_-]\d+)*\s*$/i,'').replace(/\s+/g,' ').trim()}
   function href(path){return PAGES+path.split('/').map(encodeURIComponent).join('/')}
-  function recalcPerPage(){const w=innerWidth,h=innerHeight;const cols=w<=650?2:w<=980?3:5;const rows=h<=560?2:h<=720?3:4;state.perPage=cols*rows}
+  function recalcPerPage(){
+      const styles=getComputedStyle(el.main);
+      const w=innerWidth;
+      const cols=w<=650?2:w<=980?3:5;
+      const gap=w<=650?8:12;
+      const minRow=w<=650?58:68;
+      const available=Math.max(0,el.main.clientHeight-parseFloat(styles.paddingTop||0)-parseFloat(styles.paddingBottom||0));
+      const rows=Math.max(1,Math.floor((available+gap)/(minRow+gap)));
+      state.perPage=Math.max(cols,cols*rows);
+    }
   function filtered(){return state.all.filter(x=>x.category===state.category&&x.name.toLocaleLowerCase('cs').includes(state.query))}
   function renderTabs(){
     const categories=new Map([['hry','🎮 Hry'],['utilitky','🛠️ Utilitky']]);
@@ -88,7 +97,8 @@
   }
   el.search.addEventListener('input',()=>{state.query=el.search.value.trim().toLocaleLowerCase('cs');state.page=1;render()});
   el.prev.addEventListener('click',()=>{state.page--;render()});el.next.addEventListener('click',()=>{state.page++;render()});
-  addEventListener('resize',()=>{const old=state.perPage;recalcPerPage();if(old!==state.perPage){state.page=1;render()}});
+  let resizeFrame=0;
+    addEventListener('resize',()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(()=>{const old=state.perPage;recalcPerPage();if(old!==state.perPage){const firstVisible=(state.page-1)*old;state.page=Math.floor(firstVisible/state.perPage)+1;render()}})});
 
   fetch(API,{headers:{Accept:'application/vnd.github+json'}}).then(r=>{if(!r.ok)throw new Error(`GitHub API: ${r.status}`);return r.json()}).then(data=>{
     state.all=(data.tree||[]).filter(x=>x.type==='blob'&&/\.html?$/i.test(x.path)&&!/^index\.html?$/i.test(x.path)).map(x=>({path:x.path,name:label(x.path),category:category(x.path)})).filter(x=>x.path.includes('/')).sort((a,b)=>a.name.localeCompare(b.name,'cs',{numeric:true,sensitivity:'base'}));
